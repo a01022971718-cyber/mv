@@ -152,7 +152,8 @@ function drawLantern(ctx, x, y, s, o, t) {
   o = Object.assign({ view: 'front', emo: 'neutral', legs: 'stand', walk: 0, arms: 'down', lift: 0, lean: 0, lid: 0, acc: null, stretch: 0, flip: false }, o);
   const th = LVIEW[o.view], E = EMO[o.emo] || EMO.neutral;
   ctx.save(); ctx.translate(x, y);
-  sb(ctx, ell(0, 0, s * 0.95 * (1 - o.lift * 0.4), s * 0.13, 16), rgba('#5a4a3a', 0.18), { line: null, wash: false, amp: 1 });
+  if (WATERCOLOR) { ctx.save(); ctx.filter = 'blur(3px)'; sb(ctx, ell(0, 2, s * 1.0 * (1 - o.lift * 0.4), s * 0.16, 16), rgba('#8a7aa0', 0.32), { line: null, wash: false, amp: 1.5 }); ctx.restore(); }
+  else sb(ctx, ell(0, 0, s * 0.95 * (1 - o.lift * 0.4), s * 0.13, 16), rgba('#5a4a3a', 0.18), { line: null, wash: false, amp: 1 });
   ctx.scale(s * (o.flip ? -1 : 1), s); ctx.translate(0, -o.lift); ctx.rotate(o.lean);
   const br = Math.sin(t * 2.4) * 0.012; ctx.scale(1 - o.stretch * 0.5 + br, 1 + o.stretch - br);
   // 腿（侧面时前后重叠）

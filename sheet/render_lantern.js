@@ -32,7 +32,7 @@ function turnSheet() {
   [['guapi', 'GUAPI CAP'], ['douli', 'DOULI'], ['tiger', 'TIGER HAT'], ['phoenix', 'PHOENIX'], ['wusha', 'WUSHA'], ['hairpin', 'HAIRPIN'], ['knot', 'KNOT'], ['lock', 'LOCK'], ['fan', 'FAN'], ['opera', 'OPERA'], ['collar', 'COLLAR'], ['plum', 'PLUM'], ['panda', 'PANDA'], ['headphones', 'HEADPHONES'], ['bow', 'BOW']].forEach(([a, l], i) => {
     const cx = 80 + i * 126.5; drawLantern(ctx, cx, 985, 36, { acc: a, eyes: a === 'headphones' ? 'closed' : null }, 0.3 + i * 0.4); label(ctx, l, cx, 1020, 13);
   });
-  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.5; ctx.drawImage(p, 0, 0, 1920, 1080); ctx.restore();
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = WATERCOLOR ? 0.85 : 0.5; ctx.drawImage(p, 0, 0, 1920, 1080); ctx.restore();
   return c.toDataURL('image/png');
 }
 // 动图：转一圈（8 个视角各 0.4 秒）+ 侧面走路
@@ -62,11 +62,14 @@ function turnFrame(f) {
   const page = await browser.newPage();
   page.on('pageerror', e => console.error('pageerror', e));
   await page.setContent('<html><body></body></html>');
+  const WC = process.env.WC === '1';
   for (const f of [path.join(__dirname, '..', 'src', 'lib.js'), path.join(__dirname, 'seedling.js'), path.join(__dirname, 'turnaround.js'), path.join(__dirname, 'lantern.js')])
     await page.addScriptTag({ content: fs.readFileSync(f, 'utf8') });
   await page.addScriptTag({ content: PAGE });
+  if (WC) await page.evaluate(() => { document.body.insertAdjacentHTML('beforeend', WC_SVG); WATERCOLOR = true; BLOTCH = makeBlotch(1920, 1080); });
   const save = (p, d) => fs.writeFileSync(p, Buffer.from(d.split(',')[1], 'base64'));
-  save(path.join(out, 'lantern_sheet.png'), await page.evaluate(() => turnSheet()));
+  save(path.join(out, WC ? 'lantern_sheet_wc.png' : 'lantern_sheet.png'), await page.evaluate(() => turnSheet()));
+  if (WC) { await browser.close(); return; }
   for (let f = 0; f < 150; f++) save(path.join(fr, `f${String(f).padStart(3, '0')}.png`), await page.evaluate(f => turnFrame(f), f));
   await browser.close();
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-framerate', '25', '-i', path.join(fr, 'f%03d.png'),

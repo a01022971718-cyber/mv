@@ -66,12 +66,101 @@ function xf(pts, x, y, s, rot = 0, sx = 1) {
   return pts.map(p => { const px = p[0] * s * sx, py = p[1] * s; return [x + px * c - py * si, y + px * si + py * c]; });
 }
 
+// ---------- 水彩模式（可选）：晕开的色块边缘、颜料斑驳、错位上色、干笔墨线 ----------
+// 页面里要先放 WC_SVG 里的两个 SVG 滤镜，并设 WATERCOLOR = true、BLOTCH = makeBlotch(w, h)
+let WATERCOLOR = false, BLOTCH = null;
+const WC_SVG = `<svg width="0" height="0" style="position:absolute"><defs>
+<filter id="wcEdge" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="4" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="7" xChannelSelector="R" yChannelSelector="G"/></filter>
+<filter id="wcInk" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed="9" result="n"/><feDisplacementMap in="SourceGraphic" in2="n" scale="3.2" xChannelSelector="R" yChannelSelector="G"/></filter>
+</defs></svg>`;
+function makeBlotch(w, h) { // 颜料堆积的深浅斑驳（灰度，用正片叠底盖在色块上）
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d'), img = x.createImageData(w, h), d = img.data;
+  const grid = (cell, seed) => { const gw = Math.ceil(w / cell) + 2, g = []; for (let j = 0; j < Math.ceil(h / cell) + 2; j++) for (let i = 0; i < gw; i++) g.push(hash(i * 13.1 + j * 71.7 + seed)); return [g, gw, cell]; };
+  const layers = [grid(70, 1), grid(23, 2), grid(7, 3)], sm = u => u * u * (3 - 2 * u);
+  const val = ([g, gw, cell], px, py) => { const gx = px / cell, gy = py / cell, i = Math.floor(gx), j = Math.floor(gy), fx = sm(gx - i), fy = sm(gy - j); return lerp(lerp(g[j * gw + i], g[j * gw + i + 1], fx), lerp(g[(j + 1) * gw + i], g[(j + 1) * gw + i + 1], fx), fy); };
+  for (let py = 0; py < h; py++) for (let px = 0; px < w; px++) {
+    const v = 0.55 * val(layers[0], px, py) + 0.3 * val(layers[1], px, py) + 0.15 * val(layers[2], px, py) + (hash(px * 0.37 + py * 3.1) - 0.5) * 0.12;
+    const k = (py * w + px) * 4, c8 = 255 - Math.max(0, v - 0.35) * 150;
+    d[k] = c8; d[k + 1] = c8; d[k + 2] = c8; d[k + 3] = 255;
+  }
+  x.putImageData(img, 0, 0); return c;
+}
+function wcFill(ctx, p1, fill, o) {
+  const m = ctx.getTransform(), sc = Math.hypot(m.a, m.b) || 1, ampU = 2.4 / sc;
+  ctx.save(); ctx.setTransform(m.a, m.b, m.c, m.d, m.e + 1.4, m.f + 1.0); // 上色和墨线略微错开
+  // 两层随机晕开的半透明色，边缘不规则、重叠处更深
+  [[0.62, 101], [0.62, 202]].forEach(([a, sd]) => { trace(ctx, wob(p1, ampU, sd), true); ctx.fillStyle = fill; ctx.globalAlpha = (o.alpha ?? 1) * a; ctx.fill(); });
+  ctx.globalAlpha = o.alpha ?? 1;
+  trace(ctx, p1, true); ctx.clip();
+  if (BLOTCH && o.wash !== false) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.45; ctx.drawImage(BLOTCH, 0, 0); ctx.restore(); }
+  if (o.wash !== false && typeof fill === 'string' && fill[0] === '#') { // 边缘积色
+    trace(ctx, p1, true); ctx.strokeStyle = shade(fill, -0.3); ctx.globalAlpha = 0.28; ctx.lineWidth = 6 / sc; ctx.stroke();
+    ctx.globalAlpha = 0.18; ctx.lineWidth = 12 / sc; ctx.stroke();
+  }
+  ctx.restore();
+}
+// 粗细变化的毛笔墨线：把路径加密，按"压力"算每点宽度，画成实心笔触
+function densify(pts, closed, n = 7) {
+  const out = [], L = pts.length, segs = closed ? L : L - 1;
+  for (let i = 0; i < segs; i++) { const a = pts[i], b = pts[(i + 1) % L]; for (let k = 0; k < n; k++) out.push([lerp(a[0], b[0], k / n), lerp(a[1], b[1], k / n)]); }
+  if (!closed) out.push(pts[L - 1]);
+  return out;
+}
+function chaikin(pts, closed, it = 3) { // 曲线磨圆（点数少的方形保持尖角）
+  let p = pts;
+  for (let k = 0; k < it; k++) {
+    const q = [], L = p.length, segs = closed ? L : L - 1;
+    if (!closed) q.push(p[0]);
+    for (let i = 0; i < segs; i++) { const a = p[i], b = p[(i + 1) % L]; q.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25], [a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75]); }
+    if (!closed) q.push(p[L - 1]);
+    p = q;
+  }
+  return p;
+}
+function wcStroke(ctx, pts, closed, col, lw, limbMode = false) {
+  const smooth = pts.length > 5 || (!closed && pts.length > 2);
+  const P = smooth ? chaikin(pts, closed) : densify(pts, closed), N = P.length, seed = (pts[0][0] * 13.7 + pts[0][1] * 7.1) % 97;
+  const L = [], R = [];
+  for (let i = 0; i < N; i++) {
+    const a = P[(i - 1 + N) % N], b = P[(i + 1) % N], c = P[i];
+    const pa = closed || i > 0 ? a : c, pb = closed || i < N - 1 ? b : c;
+    let dx = pb[0] - pa[0], dy = pb[1] - pa[1]; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+    const u = i / (N - 1);
+    // 压力：缓慢起伏 + 细小抖动；开放线两头收笔变细
+    let w = limbMode ? lw * (0.92 + 0.08 * Math.sin(u * 5 + seed)) / 1.3 : lw * (0.62 + 0.55 * (0.5 + 0.5 * Math.sin(u * 7.3 + seed)) + 0.18 * (hash(i * 3.7 + seed) - 0.5));
+    if (!closed && !limbMode) w *= 0.35 + 0.65 * Math.min(1, Math.min(u, 1 - u) / 0.18);
+    // 转角处多压一点墨
+    const t1x = c[0] - pa[0], t1y = c[1] - pa[1], t2x = pb[0] - c[0], t2y = pb[1] - c[1];
+    const cosA = (t1x * t2x + t1y * t2y) / ((Math.hypot(t1x, t1y) * Math.hypot(t2x, t2y)) || 1);
+    if (cosA < 0.7) w *= 1.3;
+    L.push([c[0] - dy * w * 0.65, c[1] + dx * w * 0.65]); R.push([c[0] + dy * w * 0.65, c[1] - dx * w * 0.65]);
+  }
+  ctx.save(); ctx.fillStyle = col; ctx.beginPath();
+  if (closed) {
+    L.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+    R.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+    ctx.fill('evenodd');
+  } else {
+    L.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    for (let i = R.length - 1; i >= 0; i--) ctx.lineTo(R[i][0], R[i][1]);
+    ctx.closePath(); ctx.fill();
+    if (limbMode) [P[0], P[N - 1]].forEach(q => { ctx.beginPath(); ctx.arc(q[0], q[1], lw * 0.48, 0, Math.PI * 2); ctx.fill(); }); // 肢体保持圆头
+  }
+  ctx.restore();
+}
+
 // 水彩块：底色 + 边缘积色 + 抖动墨线
 function blob(ctx, pts, fill, o = {}) {
   const amp = o.amp ?? 1.4, seed = o.seed ?? 0, lw = o.lw ?? 2.6;
   const p1 = wob(pts, amp * 0.6, seed + 11);
   ctx.save();
   if (o.alpha !== undefined) ctx.globalAlpha = o.alpha;
+  if (WATERCOLOR) {
+    if (fill) wcFill(ctx, p1, fill, o);
+    if (o.line !== null && lw > 0) wcStroke(ctx, wob(pts, amp, seed + 37), true, o.line ?? INK, lw);
+    ctx.restore(); return;
+  }
   if (fill) {
     trace(ctx, p1, true);
     ctx.fillStyle = fill; ctx.fill();
@@ -91,6 +180,7 @@ function blob(ctx, pts, fill, o = {}) {
   ctx.restore();
 }
 function inkLine(ctx, pts, lw = 2.5, col = INK, seed = 0, amp = 1.2) {
+  if (WATERCOLOR) { const px = lw * Math.hypot(ctx.getTransform().a, ctx.getTransform().b); wcStroke(ctx, wob(pts, amp, seed), false, col, lw, px > 5 || col !== INK); return; }
   trace(ctx, wob(pts, amp, seed), false);
   ctx.strokeStyle = col; ctx.lineWidth = lw; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
   ctx.stroke();
@@ -125,6 +215,7 @@ function rays(ctx, x, y, n, len, col, rot, a = 0.5, width = 0.08, seed = 0) {
     ctx.lineTo(x + Math.cos(ang - w) * L, y + Math.sin(ang - w) * L);
     ctx.lineTo(x + Math.cos(ang + w) * L, y + Math.sin(ang + w) * L);
     ctx.closePath(); ctx.fill();
+    if (limbMode) [P[0], P[N - 1]].forEach(q => { ctx.beginPath(); ctx.arc(q[0], q[1], lw * 0.48, 0, Math.PI * 2); ctx.fill(); }); // 肢体保持圆头
   }
   ctx.restore();
 }
