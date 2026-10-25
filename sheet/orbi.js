@@ -70,7 +70,7 @@ function drawOrbi(ctx, x, y, s, o, t) {
   ctx.__bodyCol = col;
   // 脸
   if (V.eyes) {
-    const ex = o.eyes || E.eyes, look = E.look || [0, 0];
+    const ex = o.eyes || E.eyes, look = o.look || E.look || [0, 0];
     ctx.save(); ctx.translate(V.fx, cy + 0.05);
     if (V.eyes === 2) {
       const far = o.view === 'q' ? 0.7 : 1;
