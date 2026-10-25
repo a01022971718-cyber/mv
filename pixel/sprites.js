@@ -11,7 +11,13 @@ const KPOSE = {
   run1: { dy: 0, lean: 1, aB: [[11, 23], [7, 27], [5, 30]], aF: [[21, 23], [25, 26], [28, 23]], lB: [[15, 34], [11, 39], [7, 41]], lF: [[17, 34], [21, 38], [23, 44]], tail: 2 },
   run2: { dy: 1, lean: 1, aB: [[11, 24], [14, 28], [17, 30]], aF: [[21, 24], [19, 29], [16, 31]], lB: [[15, 34], [16, 40], [15, 45]], lF: [[17, 34], [20, 39], [17, 42]], tail: 3 },
   raise: { dy: 0, aB: [[11, 23], [8, 28], [7, 32]], aF: [[21, 23], [25, 17], [26, 10]], lB: [[13, 34], [12, 40], [11, 45]], lF: [[19, 34], [20, 40], [21, 45]], tail: 1 },
+  point: { dy: 0, lean: 1, aB: [[11, 23], [8, 28], [7, 31]], aF: [[21, 23], [26, 22], [31, 21]], lB: [[14, 34], [11, 40], [9, 45]], lF: [[18, 34], [21, 40], [23, 45]], tail: 2 },
+  spread: { dy: 0, aB: [[11, 23], [6, 22], [2, 20]], aF: [[21, 23], [26, 22], [30, 20]], lB: [[14, 34], [13, 40], [12, 45]], lF: [[18, 34], [19, 40], [20, 45]], tail: 3 },
+  sit: { dy: 0, lean: 1, aB: [[11, 23], [14, 28], [18, 30]], aF: [[21, 23], [25, 27], [28, 29]], lB: [[14, 34], [20, 36], [20, 42]], lF: [[18, 34], [24, 35], [24, 41]], tail: 2 },
 };
+// 精灵缓存：同样参数只画一次
+const SPR = new Map();
+function C(key, fn) { if (!SPR.has(key)) SPR.set(key, fn()); return SPR.get(key); }
 
 function kidHead(g, k, hx, hy, face = 'normal') {
   // 后发
@@ -55,7 +61,7 @@ function kidHead(g, k, hx, hy, face = 'normal') {
   if (k.type !== 'spiky') { P(g, hx - 5, hy + 3, PAL.blush); P(g, hx + 5, hy + 3, PAL.blush); }
 }
 
-function makeKid(name, poseName) {
+function makeKid(name, poseName, face = 'normal') {
   const k = KIDS[name], p = KPOSE[poseName];
   const [c, g] = mk(34, 50);
   g.translate(1, 1);
@@ -76,7 +82,7 @@ function makeKid(name, poseName) {
   if (name === 'kui') { R(g, 12 + lx, 21 + dy, 8, 1, k.trim); }
   if (k.scarf) { R(g, 11 + lx, 19 + dy, 10, 3, PAL.scarf); R(g, 11 + lx, 21 + dy, 10, 1, PAL.scarf2); }
   limbO(g, p.lF, k.leg, 3); R(g, p.lF[2][0] - 1, p.lF[2][1], 4, 2, PAL.shoe);
-  kidHead(g, k, 16 + lx, 11 + dy, poseName === 'raise' ? 'normal' : 'normal');
+  kidHead(g, k, 16 + lx, 11 + dy, face);
   limbO(g, p.aF, k.top, 2); R(g, p.aF[2][0] - 1, p.aF[2][1] - 1, 2, 2, PAL.skin);
   g.setTransform(1, 0, 0, 1, 0, 0);
   return outline(c);
@@ -127,13 +133,15 @@ function makePortrait(name, face) {
     surprise: ['.kkkkk.', 'kwwwwwk', 'wwaaaww', 'wwadaww', 'wwaiaww', 'wwaaaww', '.wwwww.', '.......'],
     cry: ['.......', 'kk.....', '.kkkkkk', 'waaaaaw', 'waddiaw', 'waaaaaw', 'bbwwwbb', '.b...b.'],
     smile: ['.......', '.......', '.kkkkk.', 'k.....k', '.......', '.......', '.......', '.......'],
+    closed: ['.......', '.......', '.......', '.......', 'kkkkkkk', '.k...k.', '.......', '.......'],
   };
+  EYE.angry = EYE.normal; EYE.shout = EYE.normal;
   [[hx - 13, 0], [hx + 6, 1]].forEach(([x, side]) => {
     const rows = EYE[face].map(r => side && face === 'cry' ? [...r].reverse().join('') : r);
     mat(g, x, hy - 1, rows, em);
   });
   // 眉
-  const brow = { normal: [0, 0], surprise: [-2, -2], cry: [1, -2], smile: [0, 0] }[face];
+  const brow = { normal: [0, 0], surprise: [-2, -2], cry: [1, -2], smile: [0, 0], closed: [0, 0], angry: [-2, 1], shout: [-2, 2] }[face];
   line(g, hx - 13, hy - 4 + brow[0], hx - 8, hy - 4 + brow[1], PAL.ink, 1);
   line(g, hx + 8, hy - 4 + brow[1], hx + 13, hy - 4 + brow[0], PAL.ink, 1);
   // 泪
@@ -141,7 +149,9 @@ function makePortrait(name, face) {
   // 鼻、嘴、腮红
   P(g, hx, hy + 9, PAL.skin2);
   const mm = { m: PAL.mouth, t: '#e07a7e', k: PAL.ink };
-  if (face === 'normal') mat(g, hx - 2, hy + 13, ['kkkk'], mm);
+  if (face === 'normal' || face === 'closed') mat(g, hx - 2, hy + 13, ['kkkk'], mm);
+  if (face === 'angry') mat(g, hx - 3, hy + 13, ['kkkkkk'], mm);
+  if (face === 'shout') mat(g, hx - 4, hy + 11, ['.kkkkkk.', 'kmmmmmmk', 'kmmmmmmk', 'kmmttmmk', '.kmttmk.', '..kkkk..'], mm);
   if (face === 'surprise') mat(g, hx - 2, hy + 12, ['.mm.', 'mmmm', 'mttm', '.mm.'], mm);
   if (face === 'cry') mat(g, hx - 3, hy + 13, ['.k..k.', 'k.kk.k'], mm);
   if (face === 'smile') mat(g, hx - 3, hy + 12, ['k....k', 'kmmmmk', '.mttm.'], mm);
@@ -317,3 +327,70 @@ function makeBoom(f) {
   }
   return outline(c);
 }
+
+// ---------- 镜头用的补充素材 ----------
+// 手：0 张开 1 握拳 2 绷带握拳 3 绷带张开（掌心朝上，袖口在下）
+function makeHand(state) {
+  const [c, g] = mk(42, 46); g.translate(1, 1);
+  const band = state >= 2, sk = band ? '#efe6d2' : PAL.skin, sk2 = band ? '#c8bca4' : PAL.skin2;
+  const open = state === 0 || state === 3;
+  R(g, 12, 32, 16, 12, band ? sk : PAL.jacket); R(g, 12, 32, 3, 12, band ? sk2 : PAL.jacket2);
+  if (!band) R(g, 12, 32, 16, 2, PAL.teal);
+  if (open) {
+    poly(g, [[10, 14], [30, 14], [29, 30], [25, 34], [15, 34], [11, 30]], sk);
+    [[12, 2, 4], [17, 0, 4], [22, 1, 4], [27, 5, 3]].forEach(([x, y, w]) => { R(g, x, y, w, 15 - y, sk); R(g, x, y, 1, 15 - y, sk2); });
+    poly(g, [[10, 22], [3, 12], [6, 10], [12, 18]], sk);
+    line(g, 15, 22, 25, 22, sk2, 1);
+  } else {
+    poly(g, [[10, 12], [30, 12], [31, 28], [27, 34], [14, 34], [10, 28]], sk);
+    [17, 22, 27].forEach(x => line(g, x, 12, x, 18, sk2, 1));
+    R(g, 10, 18, 21, 1, sk2);
+    poly(g, [[10, 20], [5, 16], [7, 13], [14, 18]], sk);
+  }
+  if (band) for (let y = 20; y < 44; y += 5) line(g, 10, y, 31, y + 2, sk2, 1);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  return outline(c);
+}
+// 巨兽正脸 64×64：eyes 0 闭 1 睁，roar 0/1，f 火鬃帧
+function makeBeastFace(f, eyes = 1, roar = 0) {
+  const [c, g] = mk(66, 66); g.translate(1, 1);
+  const cx = 32, cy = 33;
+  for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2 + 0.1; maneTongue(g, cx + Math.cos(a) * 15, cy + Math.sin(a) * 15, a, 17, 5, f, i + 7); }
+  poly(g, [[cx - 15, cy - 8], [cx - 10, cy - 16], [cx, cy - 18], [cx + 10, cy - 16], [cx + 15, cy - 8], [cx + 14, cy + 4], [cx + 8, cy + 13 + roar * 3], [cx, cy + 16 + roar * 4], [cx - 8, cy + 13 + roar * 3], [cx - 14, cy + 4]], PAL.emb);
+  [-1, 1].forEach(k => { poly(g, [[cx + k * 14, cy - 5], [cx + k * 8, cy - 3], [cx + k * 13, cy - 1]], PAL.fl1); });
+  poly(g, [[cx, cy - 14], [cx + 2, cy - 10], [cx, cy - 7], [cx - 2, cy - 10]], PAL.amber2);
+  if (eyes) { const em = { w: '#fff2c4', r: PAL.fl1, k: PAL.ink }; mat(g, cx - 10, cy - 4, ['.wwww', 'wwrkw', '.www.'], em); mat(g, cx + 5, cy - 4, ['wwww.', 'wkrww', '.www.'], em); }
+  else { line(g, cx - 10, cy - 2, cx - 5, cy - 3, PAL.ink, 1); line(g, cx + 5, cy - 3, cx + 10, cy - 2, PAL.ink, 1); }
+  E(g, cx, cy + 6 + roar, 7, 5 + roar, PAL.embL);
+  poly(g, [[cx - 3, cy + 2], [cx + 3, cy + 2], [cx, cy + 5]], '#6a2c24');
+  if (roar) { poly(g, [[cx - 6, cy + 8], [cx + 6, cy + 8], [cx + 4, cy + 15], [cx - 4, cy + 15]], PAL.mouth); P(g, cx - 4, cy + 9, PAL.hi); P(g, cx + 4, cy + 9, PAL.hi); P(g, cx - 4, cy + 10, PAL.hi); P(g, cx + 4, cy + 10, PAL.hi); }
+  else line(g, cx - 3, cy + 9, cx + 3, cy + 9, PAL.ink, 1);
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  return outline(c);
+}
+function makePaw() {
+  const [c, g] = mk(30, 26); g.translate(1, 1);
+  R(g, 0, 7, 14, 10, PAL.emb); E(g, 17, 12, 8, 8, PAL.emb);
+  [[25, 6], [27, 11], [25, 16]].forEach(([x, y]) => E(g, x, y, 3, 2.5, PAL.emb));
+  E(g, 18, 12, 3, 3, '#e88a5a');
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  return outline(c);
+}
+// 缓存版本
+const kid = (n, p, f = 'normal') => C(`k${n}${p}${f}`, () => makeKid(n, p, f));
+const face = (n, f) => C(`p${n}${f}`, () => makePortrait(n, f));
+const ember = f => C(`e${f}`, () => makeEmberSmall(f));
+const beast = f => C(`b${f}`, () => makeBeast(f));
+const bface = (f, e = 1, r = 0) => C(`bf${f}${e}${r}`, () => makeBeastFace(f, e, r));
+const crow = f => C(`v${f}`, () => makeVillain(f));
+const amulet = s => C(`a${s}`, () => makeAmulet(s));
+const hand = s => C(`h${s}`, () => makeHand(s));
+const paw = () => C('paw', makePaw);
+const dand = r => C(`d${r}`, () => makeDandelion(r));
+const seedS = () => C('seed', makeSeed);
+const small = k => C(`s${k}`, () => makeSmall(k));
+const flameS = f => C(`f${f}`, () => makeFlame(f));
+const boltS = f => C(`l${f}`, () => makeBolt(f));
+const starS = f => C(`st${f}`, () => makeStar(f));
+const boomS = f => C(`bo${f}`, () => makeBoom(f));
+const scene = n => C(`sc${n}`, () => makeScene(n));
