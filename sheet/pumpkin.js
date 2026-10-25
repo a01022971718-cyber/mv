@@ -69,14 +69,14 @@ function fillWC(ctx, pts, col, o = {}) {
   path(wob(o.sharp || pts.length <= 5 ? densify(pts, true, 6) : pts, px(2.2), seed + 9)); ctx.fillStyle = shade(col, -0.05); ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = 1;
   path(pts); ctx.clip();
   if (o.pool !== false && h * sc > 16) {
-    ctx.save(); ctx.filter = `blur(${Math.max(1, Math.round(h * sc * 0.04))}px)`; ctx.fillStyle = shade(col, -0.17); ctx.globalAlpha = 0.4;
+    ctx.save(); ctx.filter = `blur(${Math.max(1, Math.round(h * sc * 0.04))}px)`; ctx.fillStyle = o.poolCol ?? shade(col, -0.17); ctx.globalAlpha = o.poolA ?? 0.4;
     const band = []; for (let i = 0; i <= 12; i++) band.push([x0 - wd * 0.1 + wd * 1.2 * i / 12, y0 + h * (0.64 + 0.035 * Math.sin(i * 1.9 + seed))]);
     band.push([x1 + wd * 0.2, y1 + h], [x0 - wd * 0.2, y1 + h]); trace(ctx, band, true); ctx.fill(); ctx.restore();
     ctx.save(); ctx.filter = `blur(${Math.max(2, Math.round(h * sc * 0.1))}px)`; ctx.fillStyle = shade(col, 0.16); ctx.globalAlpha = 0.25;
     trace(ctx, ell(x0 + wd * 0.38, y0 + h * 0.28, wd * 0.24, h * 0.13, 12), true); ctx.fill(); ctx.restore();
   }
-  if (BLOTCH) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.28; ctx.drawImage(BLOTCH, 0, 0); ctx.restore(); }
-  ctx.save(); ctx.filter = 'blur(1.4px)'; path(pts); ctx.strokeStyle = shade(col, -0.3); ctx.globalAlpha = 0.32; ctx.lineWidth = px(3.5); ctx.stroke(); ctx.restore();
+  if (BLOTCH) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = o.blotch ?? 0.28; ctx.drawImage(BLOTCH, 0, 0); ctx.restore(); }
+  ctx.save(); ctx.filter = 'blur(1.4px)'; path(pts); ctx.strokeStyle = o.edgeCol ?? shade(col, -0.3); ctx.globalAlpha = 0.32; ctx.lineWidth = px(3.5); ctx.stroke(); ctx.restore();
   ctx.restore();
 }
 function flatPart(ctx, pts, col, w, o = {}) { fillWC(ctx, pts, col, Object.assign({ pool: false }, o)); inkV(ctx, pts, true, w, { sharp: o.sharp, seed: o.seed ?? 0, wf: o.wf }); }

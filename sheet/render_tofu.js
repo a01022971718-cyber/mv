@@ -25,8 +25,9 @@ async function sheet(fontData) {
   ground(ctx, 735, 2); const s = 74, Y = 735;
   drawTofu(ctx, 180, Y - 4, s, { view: 'side', legs: 'walk', walk: 1.25, arms: 'swing', lean: 0.05 }); label(ctx, 'WALK (SIDE)', 180, 772);
   drawTofu(ctx, 490, Y, s, { view: 1.1, arms: 'out' }); label(ctx, 'TURN / SPINVIEW', 490, 772);
-  // SMEAR：身后拖出干笔刷痕
-  ctx.save(); for (let i = 0; i < 8; i++) { const yy = Y - s * (0.55 + i * 0.19), len = s * (0.9 + hash(i * 3) * 0.8), x0 = 830 - s * 0.55; ctx.fillStyle = rgba(TF.body, 0.75 - i * 0.03); ctx.beginPath(); ctx.moveTo(x0, yy - 6); for (let k = 0; k <= 6; k++) ctx.lineTo(x0 - len * k / 6, yy - 6 + k * 0.8 + (hash(i * 9 + k) - 0.5) * 3); ctx.lineTo(x0 - len * 0.93, yy + 5); ctx.lineTo(x0, yy + 6); ctx.closePath(); ctx.fill(); } ctx.restore();
+  // SMEAR：身后拖出暖棕色干笔刷痕 + 两层淡残影
+  ctx.save(); [0.22, 0.12].forEach((al, j) => { ctx.globalAlpha = al; ctx.fillStyle = '#e3c99a'; ctx.fillRect(840 - s * (1.05 + j * 0.42), Y - s * (TLEG + TH * 0.98), s * 0.9, s * TH * 0.95); }); ctx.restore();
+  ctx.save(); for (let i = 0; i < 9; i++) { const yy = Y - s * (TLEG + 0.12 + i * 0.15), len = s * (0.8 + hash(i * 3) * 0.9), x0 = 840 - s * 0.62; ctx.fillStyle = rgba('#d2b07c', 0.7 - i * 0.04); ctx.beginPath(); ctx.moveTo(x0, yy - 5); for (let k = 0; k <= 6; k++) ctx.lineTo(x0 - len * k / 6, yy - 5 + k * 0.7 + (hash(i * 9 + k) - 0.5) * 3); ctx.lineTo(x0 - len * 0.92, yy + 4); ctx.lineTo(x0, yy + 5); ctx.closePath(); ctx.fill(); } ctx.restore();
   for (let i = 0; i < 3; i++) inkLine(ctx, [[830 - s * 1.0, Y - s * (0.75 + i * 0.4)], [830 - s * 1.75, Y - s * (0.77 + i * 0.4)]], 1.3, 'rgba(42,34,48,0.75)', 420 + i, 0.4);
   drawTofu(ctx, 840, Y, s, { view: 'side', lean: 0.1, arms: 'back', sx: 1.15, sy: 0.93 });
   U(840, Y, s, () => { star(ctx, 1.2, -2.05, 0.3, 1); star(ctx, 1.52, -1.75, 0.14, 2); }); label(ctx, 'SMEAR', 820, 772);

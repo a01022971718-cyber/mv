@@ -1,7 +1,7 @@
 // 原创角色"豆豆"：一块小豆腐（奶白色、接近立方体、两条短腿、圆手、圆点眼 + 腮红、头顶一小撮葱）
 // 2.5D：平视；转动时正面/侧面互换宽度，中间一条细分面线；每个面一个平涂色值
 // 依赖 src/lib.js 与 sheet/pumpkin.js 里的画法工具（inkV / fillWC / flatPart / pool / star / bangMark / contourW / LIGHT / L_*）
-const TF = { body: '#f7eedb', limb: '#d9c49b', blush: '#f2a2a0', scal: '#78ad48', scal2: '#4e7f2e', eye: '#2a2230', line: '#7a6a58' };
+const TF = { body: '#faefd9', limb: '#d9c49b', blush: '#f2a2a0', scal: '#78ad48', scal2: '#4e7f2e', eye: '#2a2230', line: '#7a6a58' };
 const TW = 1.7, TD = 1.15, TH = 1.45, TLEG = 0.3;
 const TVIEW = { front: 0, q: 0.61, side: Math.PI / 2, qback: Math.PI - 0.61, back: Math.PI };
 
@@ -20,13 +20,21 @@ function boxRect(x0, x1, y0, y1) { return [[x0, y0], [x1, y0], [x1, y1], [x0, y1
 // 身体一段（y0~y1）：底色 → 背光的面暗一档 → 面与面之间的细分面线 → 外轮廓（顶边最重）
 function tBody(ctx, G, y0, y1, seed = 1, edges = { top: true, bot: true }) {
   const sil = boxRect(G.xmin, G.xmax, y0, y1);
-  fillWC(ctx, sil, TF.body, { seed, sharp: true });
+  fillWC(ctx, sil, TF.body, { seed, sharp: true, blotch: 0.13, poolCol: '#e3c99a', poolA: 0.45, edgeCol: '#c9a878' });
   ctx.save(); ctx.beginPath(); ctx.rect(G.xmin, y0, G.xmax - G.xmin, y1 - y0); ctx.clip();
-  G.vis.forEach(f => { const dot = f.nx * LIGHT[0] + f.nz * LIGHT[1], a = clamp((0.9 - dot) * 0.32, 0, 0.3); if (a > 0.02) { ctx.fillStyle = rgba(shade(TF.body, -0.3), a); ctx.fillRect(f.x0, y0 - 1, f.x1 - f.x0, y1 - y0 + 2); } });
+  G.vis.forEach(f => { const dot = f.nx * LIGHT[0] + f.nz * LIGHT[1], a = clamp((0.9 - dot) * 0.32, 0, 0.3); if (a > 0.02) { ctx.fillStyle = rgba('#d6b98c', a * 1.1); ctx.fillRect(f.x0, y0 - 1, f.x1 - f.x0, y1 - y0 + 2); } });
   ctx.restore();
   const xs = G.vis.map(f => f.x0).filter(x => x > G.xmin + 0.02);
   xs.forEach((x, i) => inkV(ctx, [[x, y0 + 0.05], [x + 0.004, (y0 + y1) / 2], [x, y1 - 0.05]], false, L_PLANE, { col: TF.line, seed: 5 + i, taper: true, alpha: 0.85 }));
-  inkV(ctx, sil, true, L_TOP, { wf: contourW, sharp: true, seed });
+  boxInk(ctx, G.xmin, G.xmax, y0, y1, seed, edges);
+}
+// 方块轮廓：四条边分开画、在角上略微出头；粗细按空间：顶边最重 > 底边 > 背光的右边 > 受光的左边
+function boxInk(ctx, x0, x1, y0, y1, seed, edges = { top: true, bot: true }) {
+  const o = 0.035, st = (a, b, w, sd) => inkV(ctx, [a, b], false, w, { seed: seed * 10 + sd });
+  if (edges.top !== false) st([x0 - o, y0 + 0.004], [x1 + o * 1.2, y0 - 0.004], L_TOP * 1.45, 1);
+  if (edges.bot !== false) st([x0 - o * 0.6, y1], [x1 + o, y1 + 0.004], L_TOP * 1.12, 2);
+  st([x0, y0 - o * 0.8], [x0 - 0.004, y1 + o * 0.7], L_TOP * 0.78, 3);
+  st([x1 + 0.004, y0 - o * 0.6], [x1, y1 + o], L_TOP * 0.95, 4);
 }
 function tFace(ctx, G, y, expr) {
   const f = G.F[0], edgeCheat = f.nz <= 0.15 && G.c > -0.05; // 正侧面：像模板一样在前边缘留一只眼
@@ -71,9 +79,9 @@ function drawTofu(ctx, x, y, s, o) {
   ctx.scale(s, s); ctx.translate(0, -o.lift); ctx.rotate(o.lean); ctx.scale(o.sx, o.sy);
   // 腿（都在身体后面，底边压住腿的上端）
   const legs = [-1, 1].map((k, i) => {
-    const wx = k * TW * 0.24, xx = G.px(wx, 0), z = G.depth(wx, 0), st = o.legs === 'walk' ? Math.sin(o.walk + i * Math.PI) : 0;
-    const ax = xx + z * 0.12;
-    return { a: [ax, bot - 0.08], b: [ax + st * 0.28 * G.s, -Math.max(0, -st) * 0.05], z };
+    const wx = k * TW * 0.24, xx = G.px(wx, 0), z = G.depth(wx, 0), st = o.legs === 'walk' ? Math.sign(G.depth(wx, 0) || (i ? 1 : -1)) * Math.abs(Math.sin(o.walk)) : 0; // 近腿在前、远腿在后，分开成倒 V
+    const ax = xx + z * 0.12 + st * 0.07 * G.s;
+    return { a: [ax, bot - 0.08], b: [ax + st * 0.3 * G.s, -Math.max(0, -st) * 0.05], z };
   }).sort((p, q) => p.z - q.z);
   legs.forEach((L, i) => tTab(ctx, L.a, L.b, 0.22, Math.abs(legs[0].z - legs[1].z) < 0.3 || i === 1, 20 + i));
   // 手臂：从左右侧面的中心伸出，方向按投影；近的在身体前面，远的在后面
@@ -85,7 +93,7 @@ function drawTofu(ctx, x, y, s, o) {
     else if (o.arms === 'raise') v = [Math.sign(root[0] || k) * 0.4, -0.34];
     else if (o.arms === 'back') v = [-0.46, 0.1];
     else if (o.arms === 'swing') { const sw = Math.sin(o.walk + (i ? Math.PI : 0)) * 0.7; v = [Math.sin(sw) * 0.4, Math.cos(sw) * 0.34]; }
-    else { const dx = k * G.c + 0.28 * G.s; v = [dx * 0.46 + (Math.abs(dx) < 0.35 ? 0.12 : 0), 0.13 + (1 - Math.min(1, Math.abs(dx))) * 0.1]; }
+    else { const dx = k * G.c + 0.28 * G.s; v = Math.abs(dx) < 0.35 ? [0.26 * Math.sign(G.s || 1), 0.22] : [dx * 0.46, 0.13 + (1 - Math.min(1, Math.abs(dx))) * 0.1]; }
     return { a: root, b: [root[0] + v[0], root[1] + v[1]], z };
   });
   arms.filter(A => A.z < -0.05).forEach((A, i) => tTab(ctx, A.a, A.b, 0.15, false, 40 + i, true));
