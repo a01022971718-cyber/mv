@@ -62,10 +62,12 @@ const contourW = (nx, ny) => 0.85 + 0.6 * Math.max(0, -ny) + 0.25 * Math.max(0, 
 function fillWC(ctx, pts, col, o = {}) {
   const m = ctx.getTransform(), sc = Math.hypot(m.a, m.b) || 1, px = v => v / sc, seed = o.seed ?? 0;
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]), x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys), h = y1 - y0, wd = x1 - x0;
+  // 直边形状（方块、四肢片）用折线路径，曲线形状才用平滑路径，否则方块会被填成椭圆
+  const path = q => { if (o.sharp || q.length <= 5) { ctx.beginPath(); q.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); } else trace(ctx, q, true); };
   ctx.save(); ctx.translate(px(1.3), px(0.9));
-  trace(ctx, pts, true); ctx.fillStyle = col; ctx.fill();
-  trace(ctx, wob(pts, px(2.2), seed + 9), true); ctx.fillStyle = shade(col, -0.05); ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = 1;
-  trace(ctx, pts, true); ctx.clip();
+  path(pts); ctx.fillStyle = col; ctx.fill();
+  path(wob(o.sharp || pts.length <= 5 ? densify(pts, true, 6) : pts, px(2.2), seed + 9)); ctx.fillStyle = shade(col, -0.05); ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = 1;
+  path(pts); ctx.clip();
   if (o.pool !== false && h * sc > 16) {
     ctx.save(); ctx.filter = `blur(${Math.max(1, Math.round(h * sc * 0.04))}px)`; ctx.fillStyle = shade(col, -0.17); ctx.globalAlpha = 0.4;
     const band = []; for (let i = 0; i <= 12; i++) band.push([x0 - wd * 0.1 + wd * 1.2 * i / 12, y0 + h * (0.64 + 0.035 * Math.sin(i * 1.9 + seed))]);
@@ -74,7 +76,7 @@ function fillWC(ctx, pts, col, o = {}) {
     trace(ctx, ell(x0 + wd * 0.38, y0 + h * 0.28, wd * 0.24, h * 0.13, 12), true); ctx.fill(); ctx.restore();
   }
   if (BLOTCH) { ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.28; ctx.drawImage(BLOTCH, 0, 0); ctx.restore(); }
-  ctx.save(); ctx.filter = 'blur(1.4px)'; trace(ctx, pts, true); ctx.strokeStyle = shade(col, -0.3); ctx.globalAlpha = 0.32; ctx.lineWidth = px(3.5); ctx.stroke(); ctx.restore();
+  ctx.save(); ctx.filter = 'blur(1.4px)'; path(pts); ctx.strokeStyle = shade(col, -0.3); ctx.globalAlpha = 0.32; ctx.lineWidth = px(3.5); ctx.stroke(); ctx.restore();
   ctx.restore();
 }
 function flatPart(ctx, pts, col, w, o = {}) { fillWC(ctx, pts, col, Object.assign({ pool: false }, o)); inkV(ctx, pts, true, w, { sharp: o.sharp, seed: o.seed ?? 0, wf: o.wf }); }
