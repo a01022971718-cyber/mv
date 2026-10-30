@@ -1,0 +1,1501 @@
+<title>豆豆的田园厨房</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="豆豆田园">
+<meta name="theme-color" content="#2b2230">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jersey+10&family=Pixelify+Sans:wght@400;600;700&display=swap">
+<style>
+/* 竖屏单屏游戏：顶部状态条 / 中间场景（画布 + 像素面板）/ 底部四个页签。
+   整个游戏是一个固定的像素世界（夜晚由画布里的真实时钟表现），所以只做一套配色。 */
+:root{
+  --ink:#2a2230; --ink2:#5a4c5e;
+  --paper:#fbf1d9; --paper2:#f0deb6; --paper3:#ddc28e;
+  --bg:#2b2230; --bg2:#33293a; --tab:#45384c;
+  --leaf:#7cc35a; --leaf2:#3d8a3a; --gold:#f2c14e; --tomato:#e2453a; --sky:#8ccaf0; --rose:#ef8a7a;
+  --ok:#bfe8a8; --mid:#ffe08a; --miss:#f6b8b0;
+  --f-px:"Pixelify Sans","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",ui-monospace,monospace;
+  --f-en:"Jersey 10","Pixelify Sans","PingFang SC","Noto Sans SC",ui-monospace,monospace;
+  --f-zh:"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --px-b:0 -3px 0 0 var(--ink),0 3px 0 0 var(--ink),-3px 0 0 0 var(--ink),3px 0 0 0 var(--ink);
+  color-scheme:dark;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+html{box-sizing:border-box;height:100%}
+*,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
+body{height:100%;margin:0;font-family:var(--f-px);font-size:15px;color:var(--paper);
+  background-color:var(--bg);
+  background-image:linear-gradient(45deg,var(--bg2) 25%,transparent 25%,transparent 75%,var(--bg2) 75%),linear-gradient(45deg,var(--bg2) 25%,transparent 25%,transparent 75%,var(--bg2) 75%);
+  background-size:16px 16px;background-position:0 0,8px 8px;
+  -webkit-tap-highlight-color:transparent;overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+#app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px 0}
+.pix{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;vertical-align:middle}
+.px{background:var(--paper);color:var(--ink);box-shadow:var(--px-b);margin:3px}
+h2,h3{margin:0;text-wrap:balance}
+.muted{color:var(--ink2)}
+.zh{font-family:var(--f-zh)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.end{justify-content:flex-end}
+.btn{font:inherit;font-weight:600;font-size:15px;color:var(--ink);background:var(--gold);border:0;padding:6px 12px;min-height:40px;margin:3px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  box-shadow:var(--px-b),inset 0 -3px 0 0 rgba(0,0,0,.18),inset 0 3px 0 0 rgba(255,255,255,.4)}
+.btn:active{transform:translateY(2px);box-shadow:var(--px-b),inset 0 3px 0 0 rgba(0,0,0,.2)}
+.btn:focus-visible,#tabs button:focus-visible{outline:3px solid #fff;outline-offset:5px}
+.btn.green{background:var(--leaf)}.btn.blue{background:var(--sky)}.btn.red{background:var(--rose)}.btn.ghost{background:var(--paper2)}
+.btn.sm{min-height:32px;padding:3px 9px;font-size:13px}
+.btn:disabled{background:#cfc3ab;color:#837668;cursor:not-allowed;transform:none}
+.eyebrow{margin:0;font-size:12px;letter-spacing:.08em;color:var(--ink2)}
+
+/* 顶部状态条 */
+#hud{display:flex;align-items:center;gap:10px;padding:6px 10px}
+.lvbox{flex:1;min-width:0;display:grid;gap:4px}
+.lvline{display:flex;justify-content:space-between;font-size:13px;font-variant-numeric:tabular-nums}
+.xpbar{height:10px;background:var(--paper3);box-shadow:0 0 0 2px var(--ink);margin:0 2px}
+.xpbar i{display:block;height:100%;width:0;background:linear-gradient(var(--leaf) 55%,var(--leaf2) 55%);transition:width .3s steps(6)}
+.coins{display:flex;align-items:center;gap:5px;font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.coins.bump{animation:bump .35s steps(3)}
+@keyframes bump{50%{transform:scale(1.25)}}
+
+/* 场景与页面 */
+#stage{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 3px 12px;scrollbar-width:none}
+#stage::-webkit-scrollbar{display:none}
+.view{display:grid;gap:12px;align-content:start}
+.scene-wrap{position:relative;line-height:0;background:#1a1420}
+canvas.scene{display:block;width:100%;height:auto;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:manipulation}
+.fx{position:absolute;inset:0;pointer-events:none;overflow:hidden;line-height:1.2}
+.float{position:absolute;transform:translate(-50%,-100%);font-weight:700;font-size:14px;color:#fff;white-space:nowrap;
+  text-shadow:2px 0 0 var(--ink),-2px 0 0 var(--ink),0 2px 0 var(--ink),0 -2px 0 var(--ink);animation:floatUp 1.2s steps(10) forwards}
+.float.info{color:var(--mid)}
+.float.say{background:var(--paper);color:var(--ink);text-shadow:none;padding:3px 7px;box-shadow:var(--px-b);font-size:13px;animation:sayIn 2.6s steps(6) forwards}
+@keyframes floatUp{from{opacity:1;transform:translate(-50%,-100%)}to{opacity:0;transform:translate(-50%,-280%)}}
+@keyframes sayIn{0%{opacity:0}10%,85%{opacity:1}100%{opacity:0}}
+.tip{margin:0;padding:0 4px;font-size:14px;color:var(--paper);line-height:1.4}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.tools .btn{flex:1}
+.panel{padding:10px 12px;display:grid;gap:8px}
+.panel h2{font-size:16px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.panel h2 small{font-size:12px;font-weight:400;color:var(--ink2)}
+.qlist{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.qlist li{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;font-size:14px}
+.qbar{font-variant-numeric:tabular-nums;color:var(--ink2)}
+.intro p{margin:0;font-family:var(--f-zh);font-size:14px;line-height:1.6}
+.intro ol{margin:0;padding-left:20px;font-family:var(--f-zh);font-size:14px;line-height:1.7}
+.vhead{padding:0 4px;display:grid;gap:4px}
+.vhead h2{font-size:20px}
+.vhead h2 span{font-family:var(--f-en);font-size:20px;font-weight:400;color:var(--gold);margin-left:6px}
+.vhead p{margin:0;font-family:var(--f-zh);font-size:13px;color:#e6d8c0;line-height:1.5}
+.cards{display:grid;gap:12px}
+
+/* 菜谱卡片 */
+.rc{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px}
+.rc h3{font-family:var(--f-en);font-weight:400;font-size:21px;line-height:1.05}
+.rc .sub{font-size:13px;margin:2px 0 6px;font-family:var(--f-zh);color:var(--ink2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:3px;font-size:13px;padding:1px 6px 1px 2px;background:var(--paper2);font-variant-numeric:tabular-nums}
+.chip.lack{background:var(--miss)}
+.rc-side{display:grid;justify-items:end;gap:4px;font-size:13px}
+.price{display:inline-flex;align-items:center;gap:3px;font-weight:700;font-size:15px}
+.rc.locked{opacity:.6}
+.rc.locked .btn{display:none}
+
+/* 客人 */
+.cc{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 10px}
+.cc p{margin:2px 0 0;font-size:14px}
+.empty{padding:14px;font-family:var(--f-zh);font-size:14px;line-height:1.6}
+.stock{display:flex;flex-wrap:wrap;gap:8px}
+
+/* 词本 */
+.wsum{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.wsum b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.wsum span{font-size:12px;color:var(--ink2)}
+.wsum .btn{grid-column:1/-1}
+.filters{display:flex;gap:6px;flex-wrap:wrap;padding:0 2px}
+.filters .btn[aria-pressed=true]{background:var(--gold)}
+.filters .btn{background:var(--paper2)}
+.wlist{padding:4px 10px}
+.wrow{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:2px dashed var(--paper3)}
+.wrow:last-child{border-bottom:0}
+.wrow .en{font-family:var(--f-en);font-size:21px;line-height:1.1}
+.wrow .meta{font-size:12px;color:var(--ink2);font-family:var(--f-zh);margin-top:2px}
+.wrow .ipa{font-family:"Lucida Sans Unicode","Arial Unicode MS",system-ui,sans-serif;font-weight:400}
+.stars{display:inline-flex;gap:1px;vertical-align:middle}
+.locked-note{padding:6px 2px;font-size:12px;color:#e6d8c0;font-family:var(--f-zh)}
+
+/* 底部页签 */
+#tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:6px 3px 10px}
+#tabs button{position:relative;font:inherit;font-size:13px;font-weight:600;color:var(--paper);background:var(--tab);border:0;cursor:pointer;
+  display:grid;justify-items:center;gap:2px;padding:6px 0 5px;box-shadow:var(--px-b);margin:3px}
+#tabs button[aria-selected=true]{background:var(--gold);color:var(--ink)}
+.badge{position:absolute;top:-7px;right:2px;min-width:18px;height:18px;padding:0 4px;background:var(--tomato);color:#fff;font-size:12px;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--ink);font-style:normal}
+
+/* 弹层 */
+.layer{position:fixed;inset:0;z-index:40;display:flex;align-items:flex-end;justify-content:center;background:rgba(26,18,32,.66);
+  padding:calc(env(safe-area-inset-top,0px) + 14px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 14px) max(16px,env(safe-area-inset-left,0px))}
+.layer.center{align-items:center}
+.sheet{width:100%;max-width:460px;max-height:100%;overflow-y:auto;padding:14px;display:grid;gap:12px;align-content:start}
+.layer.full .sheet{height:100%}
+.sheet h3{font-size:18px}
+.sheet .lead{margin:0;font-family:var(--f-zh);font-size:14px;line-height:1.55;color:var(--ink2)}
+.list{display:grid;gap:8px}
+.li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:6px 8px;background:var(--paper2)}
+.li b{font-size:15px}
+.li .meta{font-size:12px;color:var(--ink2);font-family:var(--f-zh)}
+.li.off{opacity:.55}
+.sec{font-size:13px;color:var(--ink2);margin:4px 0 -4px;letter-spacing:.06em}
+.big{display:grid;justify-items:center;gap:8px;text-align:center;padding:6px 0}
+.big h3{font-size:22px}
+.big p{margin:0;font-family:var(--f-zh)}
+
+/* 口语卡 */
+.speak{display:grid;gap:10px;padding:12px;background:#fffaf0;box-shadow:inset 0 0 0 2px var(--paper3)}
+.sp-en{font-family:var(--f-en);font-size:31px;line-height:1.2;color:var(--ink);-webkit-user-select:text;user-select:text}
+.sp-en .w{display:inline-block;margin-right:.3em;padding:0 2px}
+.sp-en .w.v{background:var(--mid);box-shadow:inset 0 -3px 0 0 #e0a830}
+.sp-en .w.ok{background:var(--ok);box-shadow:none}
+.sp-en .w.part{background:var(--mid);box-shadow:none}
+.sp-en .w.miss{background:var(--miss);box-shadow:none;text-decoration:underline wavy #c0392b}
+.sp-zh{font-family:var(--f-zh);font-size:14px;color:var(--ink2)}
+.sp-row{display:flex;gap:8px;flex-wrap:wrap}
+.sp-row .mic{flex:1}
+.mic.on{animation:pulse .7s steps(2) infinite}
+@keyframes pulse{50%{background:#ffb0a0}}
+.sp-heard:empty,.sp-res:empty{display:none}
+.sp-heard{font-size:13px;color:var(--ink2);min-height:1.3em;font-family:var(--f-zh);-webkit-user-select:text;user-select:text}
+.sp-res{display:flex;align-items:center;gap:8px;min-height:26px;font-weight:700}
+.sp-self{display:grid;gap:6px;font-family:var(--f-zh);font-size:13px;color:var(--ink2)}
+.sp-self p{margin:0}
+
+/* 做菜 */
+.cook{display:grid;gap:10px;align-content:start}
+.ck-top{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center}
+.ck-title b{display:block;font-family:var(--f-en);font-weight:400;font-size:22px;line-height:1.05}
+.ck-title span{font-size:13px;color:var(--ink2);font-family:var(--f-zh)}
+.pips{display:flex;gap:4px;grid-column:1/-1}
+.pips i{flex:1;height:8px;background:var(--paper3)}
+.pips i.done{background:var(--leaf)}
+.pips i.now{background:var(--gold)}
+
+/* 对话 */
+.chat{display:grid;gap:8px}
+.bub{display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start}
+.bub .txt{padding:8px 10px;background:#fffaf0;box-shadow:inset 0 0 0 2px var(--paper3)}
+.bub .txt p{margin:0}
+.bub .txt .e{font-family:var(--f-en);font-size:22px;line-height:1.1}
+.bub .txt .z{font-size:13px;color:var(--ink2);font-family:var(--f-zh);margin-top:2px}
+.bub.me{grid-template-columns:1fr auto}
+.bub.me .txt{background:#eaf6dc;box-shadow:inset 0 0 0 2px #b6d89a}
+.bub .tag{font-size:12px;color:var(--ink2)}
+
+#toasts{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:60;display:grid;gap:8px;width:min(88vw,420px);pointer-events:none}
+.toast{background:var(--ink);color:var(--paper);padding:8px 12px;font-size:14px;box-shadow:0 -3px 0 0 var(--gold),0 3px 0 0 var(--gold),-3px 0 0 0 var(--gold),3px 0 0 0 var(--gold);font-family:var(--f-px);line-height:1.4;animation:sayIn 2.8s steps(6) forwards}
+@media (prefers-reduced-motion:reduce){.float,.toast{animation-duration:.01s;animation-delay:2s}.mic.on{animation:none;background:#ffb0a0}.coins.bump{animation:none}}
+@media (min-width:520px){.cards.two{grid-template-columns:1fr 1fr}}
+</style>
+
+<div id="app">
+  <header id="hud" class="px">
+    <span id="ava"></span>
+    <div class="lvbox">
+      <div class="lvline"><b id="lvText">Lv 1</b><span id="xpText">0 / 40</span></div>
+      <div class="xpbar"><i id="xpFill"></i></div>
+    </div>
+    <div class="coins" id="coins"></div>
+    <button class="btn ghost sm" id="bSet" type="button">设置</button>
+  </header>
+
+  <main id="stage">
+    <section id="v-farm" class="view">
+      <div class="scene-wrap px"><canvas id="farmCv" class="scene" width="160" height="150" aria-label="农场：点地块来播种、照料和收获"></canvas><div id="farmFx" class="fx"></div></div>
+      <p id="farmTip" class="tip"></p>
+      <div class="tools">
+        <button class="btn" id="bShop" type="button"></button>
+        <button class="btn ghost" id="bBag" type="button"></button>
+      </div>
+      <section class="px panel intro" id="intro" hidden></section>
+      <section class="px panel" id="quests"></section>
+    </section>
+
+    <section id="v-kitchen" class="view" hidden>
+      <div class="vhead"><h2>厨房<span>Kitchen</span></h2><p>用农场收获的食材做菜。每一步都要把英文步骤说出来，说得越好，菜的星级越高，卖得越贵。</p></div>
+      <div id="recipes" class="cards two"></div>
+    </section>
+
+    <section id="v-diner" class="view" hidden>
+      <div class="scene-wrap px"><canvas id="dinerCv" class="scene" width="160" height="96" aria-label="小馆：客人在柜台前等你接待"></canvas></div>
+      <div class="vhead"><h2>小馆<span>Diner</span></h2><p>客人会用英语点菜、问价。你也要用英语回答，说得好还有小费。</p></div>
+      <div id="custList" class="cards"></div>
+      <section class="px panel"><h2>菜品库存 <small id="earned"></small></h2><div id="stock" class="stock"></div></section>
+    </section>
+
+    <section id="v-words" class="view" hidden>
+      <div class="vhead"><h2>词本<span>Words</span></h2><p>游戏里出现过的单词和句子都收在这里，点喇叭听发音，点一行单独练习。</p></div>
+      <section class="px panel wsum" id="wSum"></section>
+      <div class="filters" id="wFilter"></div>
+      <section class="px wlist" id="wList"></section>
+    </section>
+  </main>
+
+  <nav id="tabs" role="tablist"></nav>
+</div>
+<div id="layers"></div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+'use strict';
+// ================= 色板与像素绘图工具 =================
+const C = {
+  ink:'#2a2230', white:'#fff8ea',
+  grass:'#7cc35a', grass2:'#62ad4a', grass3:'#9ad66e', grassDk:'#3f7f3a',
+  soil:'#a26a42', soil2:'#86552f', soilEdge:'#5a3622', wet:'#6e4329', wet2:'#58341f',
+  leaf:'#5fb34a', leaf2:'#3d8a3a', leafHi:'#9ee070', stem:'#5a8a34',
+  tomato:'#e2453a', tomato2:'#a82c2c', carrot:'#f08a2a', carrot2:'#c8641e',
+  potato:'#d0aa70', potato2:'#9c7a48', corn:'#f6d54a', corn2:'#d8a42a', husk:'#b4d070',
+  onion:'#efe0ea', onion2:'#b07aa8', berry:'#e8384f', berry2:'#a01e36',
+  pumpkin:'#f2902e', pumpkin2:'#c0601a', egg:'#fbefd6', egg2:'#e0c8a0',
+  wood:'#b07848', wood2:'#7a4e2e', wood3:'#d8a070', roof:'#c94a3a', roof2:'#8e2e2a',
+  tofu:'#faefd9', tofu2:'#e3cfa8', tofuTop:'#fffaf0', limb:'#d9c49b', blush:'#f2a2a0', scal:'#78ad48', scal2:'#4e7f2e',
+  water:'#8ad4f6', water2:'#3a8ed0', gold:'#f2c14e', gold2:'#c88a1e', steel:'#c8d0dc', steel2:'#8a94a6', dark:'#3a3440',
+};
+function mk(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; return [c, g]; }
+function P(g, x, y, col) { g.fillStyle = col; g.fillRect(Math.floor(x), Math.floor(y), 1, 1); }
+function R(g, x, y, w, h, col) { g.fillStyle = col; g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h)); }
+function E(g, cx, cy, rx, ry, col) {
+  g.fillStyle = col;
+  for (let y = Math.floor(cy - ry - 1); y <= Math.ceil(cy + ry); y++)
+    for (let x = Math.floor(cx - rx - 1); x <= Math.ceil(cx + rx); x++) {
+      const dx = (x + .5 - cx) / rx, dy = (y + .5 - cy) / ry;
+      if (dx * dx + dy * dy <= 1) g.fillRect(x, y, 1, 1);
+    }
+}
+// Bresenham 线，w = 方形笔宽
+function L(g, x0, y0, x1, y1, col, w = 1) {
+  x0 = Math.round(x0); y0 = Math.round(y0); x1 = Math.round(x1); y1 = Math.round(y1);
+  const dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, o = Math.floor((w - 1) / 2);
+  let e = dx + dy; g.fillStyle = col;
+  for (;;) {
+    g.fillRect(x0 - o, y0 - o, w, w);
+    if (x0 === x1 && y0 === y1) break;
+    const e2 = 2 * e; if (e2 >= dy) { e += dy; x0 += sx; } if (e2 <= dx) { e += dx; y0 += sy; }
+  }
+}
+function mat(g, x, y, rows, map) { rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.' && map[ch]) P(g, x + i, y + j, map[ch]); })); }
+// 自动描边：透明像素若四邻有实像素 → 墨色
+function outline(c, col = C.ink) {
+  const g = c.getContext('2d'), w = c.width, h = c.height, d = g.getImageData(0, 0, w, h).data, a = i => d[i * 4 + 3] > 0, add = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (a(i)) continue;
+    if ((x > 0 && a(i - 1)) || (x < w - 1 && a(i + 1)) || (y > 0 && a(i - w)) || (y < h - 1 && a(i + w))) add.push(i);
+  }
+  g.fillStyle = col; add.forEach(i => g.fillRect(i % w, (i / w) | 0, 1, 1)); return c;
+}
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function dpick(x, y, t, a, b) { return t * 16 > BAYER[(y & 3) * 4 + (x & 3)] + .5 ? b : a; }
+function lerpHex(a, b, t) { const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16), ch = s => [(s >> 16) & 255, (s >> 8) & 255, s & 255], A = ch(pa), B = ch(pb); return '#' + A.map((v, i) => Math.round(v + (B[i] - v) * t).toString(16).padStart(2, '0')).join(''); }
+function skyFill(g, x0, y0, w, h, c1, c2, bands = 5) {
+  for (let y = 0; y < h; y++) {
+    const t = y / Math.max(1, h - 1) * (bands - 1), k = Math.min(bands - 2, Math.floor(t)), f = t - k;
+    const a = lerpHex(c1, c2, k / (bands - 1)), b = lerpHex(c1, c2, (k + 1) / (bands - 1));
+    for (let x = 0; x < w; x++) P(g, x0 + x, y0 + y, f > .62 ? dpick(x, y, (f - .62) / .38, a, b) : a);
+  }
+}
+function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+function box(g, x, y, w, h, col) { R(g, x - 1, y - 1, w + 2, h + 2, C.ink); R(g, x, y, w, h, col); }
+// 精灵缓存：同一个 key 只画一次；sprite() 留 1px 边给描边
+const SPR = new Map();
+function spr(k, fn) { let s = SPR.get(k); if (!s) { s = fn(); SPR.set(k, s); } return s; }
+function sprite(w, h, draw, ol = true) { const [c, g] = mk(w + 2, h + 2); g.translate(1, 1); draw(g); g.setTransform(1, 0, 0, 1, 0, 0); return ol ? outline(c) : c; }
+
+// ================= 作物精灵（20×24，锚点在底部中间 (10,23)） =================
+const CD = {
+  lettuce(g, st) {
+    if (st === 2) { E(g, 10, 21, 5, 2.6, C.leaf); E(g, 10, 20, 3, 1.8, C.leafHi); return; }
+    E(g, 10, 20, 8, 3.6, C.leaf2); E(g, 10, 19, 6.4, 3.4, C.leaf); E(g, 10, 18.4, 4, 2.4, C.leafHi); E(g, 10, 18, 1.8, 1.2, '#e6f7b8');
+    [3, 6, 9, 12, 15].forEach((x, i) => P(g, x + 1, 16 + (i % 2), C.leaf));
+  },
+  carrot(g, st) {
+    const big = st === 3, h = big ? 13 : 9;
+    [[-5, -h + 3], [-2, -h], [1, -h + 1], [4, -h + 2], [6, -h + 5]].forEach(([dx, dy], i) => {
+      const x1 = 10 + dx, y1 = 21 + dy;
+      L(g, 10, 21, x1, y1, i % 2 ? C.leaf : C.leaf2); P(g, x1, y1, C.leafHi); P(g, x1 + (dx < 0 ? 1 : -1), y1 + 1, C.leafHi); P(g, (10 + x1) / 2 - 1, (21 + y1) / 2, C.leafHi);
+    });
+    if (big) { E(g, 10, 22, 3.4, 2.2, C.carrot); P(g, 9, 21, '#ffc070'); P(g, 11, 22, C.carrot2); } else E(g, 10, 22.5, 2, 1.2, C.leaf2);
+  },
+  tomato(g, st) {
+    const big = st === 3, o = big ? 0 : 3;
+    R(g, 10, 3 + o, 1, 20 - o, C.wood);
+    E(g, 10, 12 + o, 6, 7.5 - o / 2, C.leaf); E(g, 8, 10 + o, 3, 3, C.leafHi); E(g, 13, 15 + o, 3, 2.5, C.leaf2);
+    R(g, 10, 2 + o, 1, 4, C.wood);
+    const f = big ? C.tomato : '#a8d860', f2 = big ? C.tomato2 : '#78ae40', hi = big ? '#ffb4a4' : '#e0f4b0';
+    (big ? [[6, 9], [14, 12], [8, 17]] : [[7, 12], [13, 16]]).forEach(([x, y]) => { E(g, x, y, 2.4, 2.3, f); P(g, x + 1, y + 1, f2); P(g, x, y + 1, f2); P(g, x - 1, y - 1, hi); P(g, x, y - 2, C.leafHi); });
+    R(g, 9, 20, 3, 4, C.stem);
+  },
+  potato(g, st) {
+    const big = st === 3, o = big ? 0 : 3;
+    E(g, 10, 15 + o, 7.5 - o / 2, 6 - o / 2, C.leaf); E(g, 8, 13 + o, 4, 3, C.leafHi); E(g, 13, 17 + o, 3.4, 2.4, C.leaf2); R(g, 9, 20, 3, 4, C.stem);
+    if (big) {
+      [[5, 11], [13, 10], [10, 13]].forEach(([x, y]) => { P(g, x, y, '#f6f0ff'); P(g, x + 1, y, '#c8a0e0'); P(g, x, y + 1, '#c8a0e0'); P(g, x + 1, y + 1, '#f6f0ff'); });
+      E(g, 5, 22, 2.8, 1.8, C.potato); P(g, 4, 21, '#ecd4a0'); P(g, 6, 22, C.potato2); E(g, 15, 22, 2.6, 1.7, C.potato); P(g, 15, 21, '#ecd4a0'); P(g, 16, 22, C.potato2);
+    }
+  },
+  onion(g, st) {
+    const big = st === 3, h = big ? 16 : 10;
+    L(g, 9, 21, 6, 21 - h + 4, C.leaf, 2); L(g, 10, 21, 10, 21 - h, C.leafHi, 2); L(g, 11, 21, 14, 21 - h + 2, C.leaf2, 2);
+    if (big) { E(g, 10, 21.5, 3.8, 2.6, C.onion); P(g, 9, 20, '#ffffff'); L(g, 10, 20, 10, 23, C.onion2); P(g, 8, 22, C.onion2); P(g, 12, 22, C.onion2); }
+  },
+  corn(g, st) {
+    const big = st === 3, top = big ? 3 : 9;
+    R(g, 10, top, 1, 23 - top, C.stem); R(g, 11, top + 2, 1, 21 - top, C.leaf2);
+    L(g, 10, 20, 4, 15, C.leaf, 2); L(g, 11, 17, 17, 12, C.leafHi, 2); L(g, 10, big ? 12 : 15, 5, big ? 7 : 12, C.leaf); L(g, 11, big ? 9 : 14, 15, big ? 5 : 11, C.leaf2);
+    if (big) { E(g, 13.5, 12, 1.8, 3.6, C.corn); P(g, 13, 10, '#fff6b8'); P(g, 14, 13, C.corn2); P(g, 13, 14, C.corn2); L(g, 12, 16, 12, 10, C.husk); L(g, 15, 16, 15, 11, C.husk); P(g, 9, 2, C.corn2); P(g, 10, 1, C.corn); P(g, 11, 2, C.corn2); }
+  },
+  strawberry(g, st) {
+    const big = st === 3;
+    E(g, 6, 19, 4, 2.6, C.leaf); E(g, 14, 19, 4, 2.6, C.leaf2); E(g, 10, 17, 3.6, 2.8, C.leafHi);
+    const fl = (x, y) => { P(g, x, y - 1, '#ffffff'); P(g, x - 1, y, '#ffffff'); P(g, x + 1, y, '#ffffff'); P(g, x, y + 1, '#ffffff'); P(g, x, y, '#f6d040'); };
+    fl(12, 13); if (!big) fl(6, 15);
+    if (big) [[5, 20], [15, 20], [10, 21]].forEach(([x, y]) => { R(g, x - 1, y, 3, 2, C.berry); P(g, x, y + 2, C.berry); P(g, x - 1, y, '#ff8a9a'); P(g, x + 1, y + 1, C.berry2); P(g, x, y + 1, '#ffe080'); P(g, x, y - 1, C.leafHi); });
+  },
+  pumpkin(g, st) {
+    const big = st === 3;
+    L(g, 1, 21, 18, 20, C.leaf2); E(g, 4, 17, 3.5, 2.8, C.leaf); E(g, 16, 16, 3, 2.6, C.leafHi); P(g, 17, 13, C.leaf2); P(g, 2, 14, C.leaf2);
+    if (big) { E(g, 10, 18.6, 6.6, 4.4, C.pumpkin); L(g, 7, 15, 7, 22, C.pumpkin2); L(g, 13, 15, 13, 22, C.pumpkin2); P(g, 8, 16, '#ffc070'); P(g, 9, 16, '#ffc070'); P(g, 8, 17, '#ffc070'); R(g, 10, 12, 2, 3, C.stem); P(g, 12, 12, C.stem); }
+    else { E(g, 10, 20, 3.6, 2.6, '#a4c858'); P(g, 9, 19, '#d4ec98'); R(g, 10, 16, 1, 2, C.stem); }
+  },
+};
+function cropSpr(id, st) {
+  return spr(`crop:${id}:${st}`, () => sprite(20, 24, g => {
+    if (st === 0) { P(g, 10, 23, C.stem); P(g, 10, 22, C.stem); P(g, 9, 21, C.leafHi); P(g, 8, 20, C.leafHi); P(g, 11, 21, C.leaf); P(g, 12, 20, C.leaf); }
+    else if (st === 1) { R(g, 10, 17, 1, 7, C.stem); E(g, 7, 17.5, 3, 1.6, C.leafHi); E(g, 13, 15.5, 3, 1.6, C.leaf); E(g, 9, 13.5, 2, 1.3, C.leafHi); }
+    else CD[id](g, st);
+  }));
+}
+const deadSpr = () => spr('dead', () => sprite(20, 24, g => { L(g, 9, 23, 7, 15, '#a07a48'); L(g, 11, 23, 13, 16, '#8a6438'); L(g, 10, 23, 10, 18, '#b08850'); P(g, 6, 14, '#a07a48'); P(g, 5, 15, '#c8a070'); P(g, 14, 15, '#8a6438'); P(g, 14, 17, '#c8a070'); }));
+const weedSpr = () => spr('weed', () => sprite(10, 8, g => { L(g, 1, 7, 0, 3, '#4f9a38'); L(g, 3, 7, 3, 1, '#3f8a30'); L(g, 4, 7, 6, 2, '#6ab848'); L(g, 7, 7, 9, 4, '#4f9a38'); P(g, 3, 0, '#e8e060'); P(g, 6, 1, '#f4f4f4'); }));
+const dropSpr = () => spr('drop', () => sprite(9, 10, g => { R(g, 0, 1, 9, 7, '#ffffff'); R(g, 1, 0, 7, 9, '#ffffff'); P(g, 3, 9, '#ffffff'); P(g, 4, 2, C.water2); R(g, 3, 3, 3, 3, C.water2); P(g, 4, 6, C.water2); P(g, 3, 3, '#bfe8ff'); }));
+const lockSpr = () => spr('lock', () => sprite(7, 8, g => { R(g, 1, 0, 5, 1, C.steel2); R(g, 1, 0, 1, 4, C.steel2); R(g, 5, 0, 1, 4, C.steel2); R(g, 0, 3, 7, 5, C.gold); P(g, 3, 5, C.ink); P(g, 3, 6, C.ink); P(g, 1, 4, '#ffe48a'); }));
+function soilSpr(kind) {
+  return spr('soil:' + kind, () => {
+    const [c, g] = mk(40, 26), cx = 20, cy = 10, hh = 9;
+    const top = { dry: C.soil, wet: C.wet, lock: C.grass2 }[kind], top2 = { dry: C.soil2, wet: C.wet2, lock: C.grass }[kind], side = { dry: C.soilEdge, wet: '#3e2416', lock: C.grassDk }[kind];
+    const row = (r, oy, pick) => { const d = r < hh ? hh - 1 - r : r - hh, hw = (hh - d) * 2, y = cy - hh + r; for (let x = cx - hw; x < cx + hw; x++) P(g, x, y + oy, pick(x, y)); };
+    for (let r = 0; r < 2 * hh; r++) row(r, 3, () => side);
+    for (let r = 0; r < 2 * hh; r++) row(r, 0, (x, y) => kind === 'lock' ? ((x + y * 3) % 5 === 0 ? top2 : top) : (((x - cx) + 2 * (y - cy) + 600) % 6 < 2 ? top2 : top));
+    return outline(c);
+  });
+}
+
+// ================= 角色与场景道具 =================
+// 豆豆：一块小豆腐（奶白、两条短腿、圆点眼 + 腮红、头顶一小撮葱），厨房里戴厨师帽
+function ddSpr(hat, f) {
+  return spr(`dd:${hat}:${f}`, () => sprite(18, 24, g => {
+    const x = 9, y = 23, b = f ? 1 : 0;
+    R(g, x - 4, y - 3, 2, 3, C.limb); R(g, x + 2, y - 3 + b, 2, 3 - b, C.limb);
+    R(g, x - 6, y - 14 - b, 12, 11, C.tofu); R(g, x + 3, y - 14 - b, 3, 11, C.tofu2);
+    R(g, x - 6, y - 14 - b, 12, 2, C.tofuTop); R(g, x + 3, y - 14 - b, 3, 2, '#f2e2c2');
+    P(g, x - 3, y - 9 - b, C.ink); P(g, x + 1, y - 9 - b, C.ink); P(g, x - 3, y - 10 - b, C.ink); P(g, x + 1, y - 10 - b, C.ink);
+    P(g, x - 4, y - 7 - b, C.blush); P(g, x + 2, y - 7 - b, C.blush); P(g, x - 1, y - 7 - b, '#8a2e3a');
+    R(g, x - 8, y - 10 - b + (f ? 1 : 0), 2, 3, C.limb); R(g, x + 6, y - 10 - b - (f ? 1 : 0), 2, 3, C.limb);
+    if (hat === 'chef') {
+      R(g, x - 5, y - 17 - b, 10, 3, '#ffffff'); E(g, x - 3, y - 19 - b, 2.8, 2.4, '#ffffff'); E(g, x + 2, y - 19.5 - b, 3, 2.4, '#ffffff'); E(g, x, y - 20.5 - b, 2.6, 2.2, '#ffffff'); R(g, x - 5, y - 15 - b, 10, 1, '#e4dcec');
+    } else {
+      P(g, x - 1, y - 15 - b, C.scal); P(g, x - 1, y - 16 - b, C.scal); P(g, x - 2, y - 17 - b, C.scal); P(g, x, y - 17 - b, C.scal2); P(g, x - 3, y - 18 - b, C.scal2); P(g, x + 1, y - 18 - b, C.scal);
+    }
+  }));
+}
+function henSpr(f) {
+  return spr('hen:' + f, () => sprite(12, 11, g => {
+    E(g, 5, 6, 4, 3, '#fffaf0'); P(g, 1, 4, '#fffaf0'); P(g, 1, 3, '#e8e0d0'); E(g, 8.5, 3, 2, 2, '#fffaf0');
+    P(g, 8, 0, C.tomato); P(g, 9, 0, C.tomato); P(g, 11, 3, C.gold); P(g, 9, 3, C.ink); P(g, 10, 4, C.tomato);
+    P(g, 4, 6, '#e8dcc8'); P(g, 5, 6, '#e8dcc8'); P(g, 6, 7, '#e8dcc8');
+    if (f) { P(g, 5, 9, C.gold); P(g, 5, 10, C.gold); P(g, 6, 9, C.gold); P(g, 6, 10, C.gold); } else { P(g, 4, 9, C.gold); P(g, 4, 10, C.gold); P(g, 7, 9, C.gold); P(g, 7, 10, C.gold); }
+  }));
+}
+const houseSpr = () => spr('house', () => sprite(36, 34, g => {
+  R(g, 26, 2, 4, 9, '#9a5a40'); R(g, 25, 1, 6, 2, '#7a4030');
+  for (let r = 0; r < 14; r++) { const half = Math.round(2 + r * 16 / 13); R(g, 18 - half, r, half * 2, 1, r % 3 === 2 ? C.roof2 : C.roof); }
+  R(g, 3, 14, 30, 19, '#f2e2c0'); for (let x = 6; x < 33; x += 5) R(g, x, 15, 1, 18, '#e0cca0'); R(g, 3, 14, 30, 1, '#c9b080');
+  R(g, 21, 21, 8, 12, C.wood2); R(g, 22, 22, 6, 11, C.wood); P(g, 26, 27, C.gold);
+  R(g, 7, 19, 9, 8, '#7ab8e0'); R(g, 11, 19, 1, 8, C.wood2); R(g, 7, 22, 9, 1, C.wood2); P(g, 8, 20, '#d8f0ff');
+  R(g, 6, 27, 11, 2, C.wood2); P(g, 8, 26, C.tomato); P(g, 11, 26, C.corn); P(g, 14, 26, C.tomato);
+}));
+const coopSpr = () => spr('coop', () => sprite(26, 22, g => {
+  for (let r = 0; r < 8; r++) { const half = Math.round(3 + r * 10 / 7); R(g, 13 - half, r, half * 2, 1, r % 3 === 2 ? '#a04040' : '#c05a48'); }
+  R(g, 2, 8, 22, 13, C.wood); for (let x = 4; x < 24; x += 4) R(g, x, 8, 1, 13, C.wood2); R(g, 9, 11, 8, 10, '#3a2a2a'); R(g, 10, 11, 6, 1, '#5a4040'); R(g, 0, 20, 26, 2, C.wood2);
+}));
+const treeSpr = () => spr('tree', () => sprite(22, 28, g => { R(g, 9, 16, 4, 12, C.wood2); R(g, 10, 16, 1, 12, C.wood); E(g, 11, 10, 10, 9, C.leaf2); E(g, 10, 8, 8, 7, C.leaf); E(g, 8, 6, 4, 3, C.leafHi); P(g, 15, 11, C.tomato); P(g, 6, 12, C.tomato); P(g, 12, 5, C.tomato); }));
+const bushSpr = () => spr('bush', () => sprite(16, 10, g => { E(g, 8, 6, 8, 4.5, C.leaf2); E(g, 6, 5, 5, 3.4, C.leaf); E(g, 5, 4, 2, 1.4, C.leafHi); P(g, 11, 4, '#f48ab8'); P(g, 3, 7, '#ffffff'); }));
+const cloudSpr = () => spr('cloud', () => sprite(22, 8, g => { E(g, 7, 5, 6, 3, '#ffffff'); E(g, 13, 4, 6, 3.6, '#ffffff'); E(g, 17, 5.5, 4, 2.4, '#ffffff'); R(g, 3, 6, 18, 2, '#e8f2ff'); }, false));
+const eggSmall = () => spr('eggS', () => sprite(4, 5, g => { E(g, 2, 2.5, 2, 2.5, C.egg); P(g, 1, 1, '#ffffff'); }));
+
+// 客人：五只原创小动物（半身像 20×22）
+const CRITTERS = {
+  mimi:  { name: 'Mimi',  zh: '小猫',   fur: '#f0a050', fur2: '#c87830', muz: '#fff4e0', shirt: '#5a8ad0', ear: 'cat',     pitch: 1.35 },
+  pip:   { name: 'Pip',   zh: '小兔',   fur: '#f6f2f0', fur2: '#d8d0d0', muz: '#ffffff', shirt: '#e07aa0', ear: 'bunny',   pitch: 1.6 },
+  bruno: { name: 'Bruno', zh: '大熊',   fur: '#9a6a44', fur2: '#74492c', muz: '#d8b088', shirt: '#4e9a5c', ear: 'bear',    pitch: 0.6 },
+  dot:   { name: 'Dot',   zh: '小鸭',   fur: '#f6d54a', fur2: '#d8a92a', muz: '#f6d54a', shirt: '#7a62c0', ear: 'duck',    pitch: 1.2 },
+  rocky: { name: 'Rocky', zh: '浣熊',   fur: '#a4aab4', fur2: '#6a707c', muz: '#f0f0f0', shirt: '#d0603a', ear: 'raccoon', pitch: 0.85 },
+};
+function critSpr(who, f) {
+  return spr(`cr:${who}:${f}`, () => sprite(20, 22, g => {
+    const k = CRITTERS[who];
+    if (k.ear === 'cat') { R(g, 4, 4, 4, 2, k.fur); R(g, 4, 2, 2, 2, k.fur); P(g, 4, 1, k.fur); P(g, 5, 4, '#f6a0a0'); R(g, 12, 4, 4, 2, k.fur); R(g, 14, 2, 2, 2, k.fur); P(g, 15, 1, k.fur); P(g, 14, 4, '#f6a0a0'); }
+    if (k.ear === 'bunny') { R(g, 6, 0, 3, 7, k.fur); R(g, 11, 0, 3, 7, k.fur); R(g, 7, 1, 1, 5, '#f6b0c0'); R(g, 12, 1, 1, 5, '#f6b0c0'); }
+    if (k.ear === 'bear') { E(g, 5, 4, 2.6, 2.6, k.fur); E(g, 15, 4, 2.6, 2.6, k.fur); P(g, 5, 4, k.fur2); P(g, 15, 4, k.fur2); }
+    if (k.ear === 'raccoon') { E(g, 5, 4, 2.2, 2.6, k.fur); E(g, 15, 4, 2.2, 2.6, k.fur); P(g, 5, 4, C.dark); P(g, 15, 4, C.dark); }
+    if (k.ear === 'duck') { P(g, 10, 3, k.fur); P(g, 9, 2, k.fur); P(g, 11, 2, k.fur2); }
+    E(g, 10, 21, 8, 4.5, k.shirt); R(g, 9, 17, 2, 2, '#ffffff');
+    E(g, 10, 10, 6.8, 6, k.fur);
+    if (k.ear === 'cat') { P(g, 9, 5, k.fur2); P(g, 10, 5, k.fur2); P(g, 11, 5, k.fur2); P(g, 10, 6, k.fur2); }
+    if (k.ear === 'raccoon') R(g, 4, 9, 13, 3, '#4a4450');
+    if (k.ear === 'duck') { R(g, 7, 12, 7, 2, '#f08a2a'); R(g, 8, 14, 5, 1, '#d06a1a'); }
+    else { E(g, 10, 13, 3.2, 2, k.muz); P(g, 10, 12, C.ink); P(g, 9, 14, C.ink); P(g, 11, 14, C.ink); }
+    const eye = k.ear === 'raccoon' ? '#ffffff' : C.ink;
+    if (f) { R(g, 6, 10, 2, 1, eye); R(g, 13, 10, 2, 1, eye); } else { R(g, 7, 9, 1, 2, eye); R(g, 13, 9, 1, 2, eye); if (k.ear === 'raccoon') { P(g, 7, 10, C.ink); P(g, 13, 10, C.ink); } }
+    P(g, 5, 12, '#f6a0a0'); P(g, 15, 12, '#f6a0a0');
+  }));
+}
+
+// ================= 物品与菜品图标 =================
+const IT = {
+  tomato: g => { E(g, 5, 5.8, 4, 3.4, C.tomato); P(g, 6, 7, C.tomato2); P(g, 7, 6, C.tomato2); P(g, 3, 4, '#ffb4a4'); P(g, 2, 5, '#ffb4a4'); R(g, 4, 2, 3, 1, C.leaf); P(g, 5, 1, C.leaf2); },
+  lettuce: g => { E(g, 5, 5.5, 4.4, 3.8, C.leaf2); E(g, 5, 5, 3.4, 3, C.leaf); E(g, 5, 4.6, 2, 1.8, C.leafHi); P(g, 5, 4, '#e6f7b8'); },
+  carrot: g => { L(g, 6, 4, 2, 8, C.carrot, 2); P(g, 7, 3, C.carrot); P(g, 1, 9, C.carrot2); P(g, 4, 6, '#ffc070'); L(g, 7, 3, 9, 0, C.leaf); L(g, 7, 3, 8, 0, C.leaf2); P(g, 9, 2, C.leafHi); },
+  potato: g => { E(g, 5, 5.5, 4.4, 3.2, C.potato); P(g, 3, 4, '#ecd4a0'); P(g, 4, 4, '#ecd4a0'); P(g, 3, 6, C.potato2); P(g, 6, 5, C.potato2); P(g, 7, 7, C.potato2); },
+  onion: g => { E(g, 5, 6, 3.8, 3.4, C.onion); L(g, 5, 3, 5, 9, C.onion2); P(g, 3, 6, C.onion2); P(g, 7, 6, C.onion2); P(g, 4, 4, '#ffffff'); R(g, 5, 0, 1, 3, C.leaf); P(g, 4, 1, C.leafHi); },
+  corn: g => { E(g, 5, 4.5, 2.2, 4, C.corn); P(g, 4, 2, '#fff6b8'); P(g, 5, 4, C.corn2); P(g, 4, 6, C.corn2); P(g, 6, 6, C.corn2); L(g, 2, 9, 3, 4, C.husk); L(g, 8, 9, 7, 4, C.husk); P(g, 5, 9, C.husk); },
+  strawberry: g => { R(g, 2, 3, 7, 3, C.berry); R(g, 3, 6, 5, 1, C.berry); R(g, 4, 7, 3, 1, C.berry); P(g, 5, 8, C.berry); P(g, 3, 4, '#ffe080'); P(g, 6, 4, '#ffe080'); P(g, 5, 6, '#ffe080'); P(g, 7, 5, C.berry2); P(g, 2, 3, '#ff8a9a'); R(g, 3, 2, 5, 1, C.leaf); P(g, 5, 1, C.leaf2); },
+  pumpkin: g => { E(g, 5, 6, 4.6, 3.4, C.pumpkin); L(g, 3, 4, 3, 8, C.pumpkin2); L(g, 7, 4, 7, 8, C.pumpkin2); P(g, 4, 4, '#ffc070'); R(g, 5, 1, 1, 2, C.stem); P(g, 6, 1, C.leaf); },
+  egg: g => { E(g, 5, 5.4, 3.2, 4, C.egg); P(g, 4, 3, '#ffffff'); P(g, 3, 4, '#ffffff'); P(g, 6, 8, C.egg2); P(g, 7, 7, C.egg2); },
+};
+const itemSpr = id => spr('it:' + id, () => sprite(10, 10, IT[id]));
+function dbowl(g, col, rim) { for (let r = 0; r < 6; r++) { const k = Math.round(7 * Math.sqrt(1 - (r / 6.2) ** 2)); R(g, 8 - k, 7 + r, 2 * k, 1, col); } R(g, 1, 7, 14, 1, rim); R(g, 5, 13, 6, 1, col); }
+function dplate(g) { E(g, 8, 10, 7.6, 3, '#ffffff'); E(g, 8, 10, 5.6, 2, '#e8ecf6'); }
+const DI = {
+  salad: g => { E(g, 8, 6.5, 6, 3, C.leaf); E(g, 6, 5.6, 2.4, 1.4, C.leafHi); E(g, 11, 6, 2, 1.4, C.leafHi); P(g, 9, 5, C.tomato); P(g, 5, 7, C.tomato); P(g, 12, 7, C.tomato); P(g, 8, 7, C.tomato); dbowl(g, '#f4f4f0', '#7ab8e0'); },
+  eggtomato: g => { dplate(g); E(g, 6, 8.5, 3.2, 2, '#f6d54a'); P(g, 5, 8, '#fff3a0'); E(g, 10.5, 9, 3, 2, C.tomato); P(g, 11, 8, '#ff9a8a'); P(g, 8, 8, C.leaf); P(g, 9, 10, C.leaf); },
+  carrots: g => { dplate(g); L(g, 4, 10, 9, 7, C.carrot, 2); L(g, 7, 11, 12, 8, C.carrot, 2); L(g, 10, 11, 13, 9, C.carrot2); P(g, 6, 8, '#ffd0a0'); P(g, 9, 8, '#ffd0a0'); P(g, 12, 8, C.leaf); },
+  mash: g => { E(g, 8, 6, 5.5, 3.2, '#fff4d0'); P(g, 6, 4, '#ffffff'); R(g, 7, 3, 3, 2, '#ffe060'); P(g, 10, 6, '#e8d8a8'); dbowl(g, '#e8b88a', '#c88a5a'); },
+  cornsoup: g => { dbowl(g, '#f4f4f0', '#e8c050'); E(g, 8, 7, 6, 1.6, '#f6d54a'); P(g, 6, 7, C.corn2); P(g, 10, 7, C.corn2); P(g, 8, 6, C.leaf); },
+  onionsoup: g => { dbowl(g, '#8a5a3c', '#6a4028'); E(g, 8, 6.5, 6.2, 2.2, '#f0c050'); P(g, 5, 6, '#c88a30'); P(g, 9, 5, '#c88a30'); P(g, 11, 7, '#c88a30'); P(g, 7, 7, '#fff0b0'); },
+  smoothie: g => { R(g, 4, 2, 8, 12, '#e4f4ff'); R(g, 5, 5, 6, 8, '#f48aa0'); R(g, 5, 5, 6, 1, '#ffc0d0'); P(g, 6, 7, '#ffffff'); L(g, 9, 0, 10, 4, '#e04848'); E(g, 12, 3, 2, 2, C.berry); P(g, 12, 1, C.leaf); },
+  pie: g => { for (let y = 4; y < 12; y++) R(g, 3, y, Math.round((y - 3) * 1.6), 1, C.pumpkin); R(g, 2, 12, 14, 2, '#c8884a'); L(g, 2, 3, 2, 12, '#c8884a', 2); E(g, 6, 6, 2, 1.2, '#ffffff'); P(g, 5, 8, '#ffc070'); },
+};
+const dishSpr = id => spr('di:' + id, () => sprite(16, 14, DI[id]));
+// 界面小图标（9×9 字符图，自带墨线）
+const UI = {
+  coin: ['..kkkkk..', '.kyywyyk.', 'kyywyyyYk', 'kywyyyyYk', 'kyyyyyyYk', 'kyyyyyYYk', 'kyyyyYYYk', '.kYYYYYk.', '..kkkkk..'],
+  star: ['....k....', '...kyk...', '...kyk...', 'kkkyyykkk', 'kyyyyyyyk', '.kyyyyyk.', '..kyyyk..', '.kyykyyk.', '.kk...kk.'],
+  spk: ['......k..', '...k...k.', '..kk.k..k', 'kkwk..k.k', 'kwwk..k.k', 'kkwk..k.k', '..kk.k..k', '...k...k.', '......k..'],
+  mic: ['...kkk...', '..kwwwk..', '..kwwwk..', '..kwwwk..', 'k.kwwwk.k', 'k..kkk..k', '.kk...kk.', '....k....', '..kkkkk..'],
+};
+function uiSpr(name, dim) {
+  return spr(`ui:${name}:${dim ? 1 : 0}`, () => { const [c, g] = mk(9, 9); mat(g, 0, 0, UI[name], dim ? { k: '#8a7e86', y: '#d8ccb8', Y: '#c0b49e', w: '#ffffff' } : { k: C.ink, y: C.gold, Y: C.gold2, w: '#ffffff' }); return c; });
+}
+const seedBagSpr = () => spr('seedbag', () => sprite(9, 10, g => { R(g, 1, 3, 7, 7, '#d8b070'); R(g, 2, 1, 5, 2, '#d8b070'); R(g, 2, 3, 5, 1, C.wood2); P(g, 4, 6, C.leaf); P(g, 3, 5, C.leafHi); P(g, 5, 5, C.leaf); P(g, 4, 7, C.stem); P(g, 2, 8, '#ecd09a'); }));
+const basketSpr = () => spr('basket', () => sprite(11, 10, g => { L(g, 2, 4, 3, 0, C.wood2); L(g, 3, 0, 7, 0, C.wood2); L(g, 7, 0, 8, 4, C.wood2); R(g, 0, 4, 11, 6, C.wood); for (let x = 1; x < 11; x += 3) R(g, x, 5, 1, 5, C.wood2); R(g, 0, 4, 11, 1, C.wood3); P(g, 3, 3, C.tomato); P(g, 6, 3, C.leaf); P(g, 7, 2, C.leafHi); }));
+const TAB_ICON = {
+  farm: g => { R(g, 0, 8, 11, 3, C.soil); R(g, 0, 8, 11, 1, C.soil2); R(g, 5, 3, 1, 5, C.stem); E(g, 3, 3, 2.2, 1.4, C.leafHi); E(g, 8, 2, 2.2, 1.4, C.leaf); },
+  kitchen: g => { R(g, 1, 4, 9, 6, C.steel); R(g, 0, 4, 11, 1, C.steel2); R(g, 1, 5, 9, 1, '#e8ecf4'); P(g, 0, 6, C.steel2); P(g, 10, 6, C.steel2); P(g, 3, 1, '#ffffff'); P(g, 4, 0, '#ffffff'); P(g, 6, 2, '#ffffff'); P(g, 7, 1, '#ffffff'); },
+  diner: g => { E(g, 5.5, 8, 5, 5, C.gold); g.clearRect(0, 8, 11, 3); R(g, 0, 8, 11, 2, C.gold2); P(g, 5, 2, C.gold2); P(g, 3, 5, '#fff0b0'); P(g, 4, 4, '#fff0b0'); },
+  words: g => { R(g, 1, 0, 9, 11, '#4a7ad0'); R(g, 8, 1, 2, 9, C.white); R(g, 1, 0, 1, 11, '#2e5aa8'); R(g, 3, 3, 4, 1, C.gold); R(g, 3, 5, 3, 1, '#c8d8f8'); },
+};
+const tabSpr = k => spr('tab:' + k, () => sprite(11, 11, TAB_ICON[k]));
+// 精灵 → <img>（data URL 缓存）
+const URLS = new Map();
+function im(key, canvas, s = 2, extra = '') { let u = URLS.get(key); if (!u) { u = canvas.toDataURL(); URLS.set(key, u); } return `<img class="pix" src="${u}" width="${canvas.width * s}" height="${canvas.height * s}" alt=""${extra}>`; }
+const itemImg = (id, s = 2) => im('it:' + id, itemSpr(id), s);
+const dishImg = (id, s = 2) => im('di:' + id, dishSpr(id), s);
+const uiImg = (n, s = 2, dim) => im(`ui:${n}:${dim ? 1 : 0}`, uiSpr(n, dim), s);
+const critImg = (w, s = 2) => im('cr:' + w, critSpr(w, 0), s);
+const starsHTML = (n, s = 2) => `<span class="stars" aria-label="${n} 星">${[1, 2, 3].map(i => uiImg('star', s, i > n)).join('')}</span>`;
+const coinHTML = (n, s = 2) => `<span class="price">${uiImg('coin', s)}${n}</span>`;
+
+// ================= 游戏数据 =================
+const CROPS = {
+  lettuce:    { zh: '生菜',   en: 'lettuce',    ipa: '/ˈletɪs/',     lv: 1, seed: 2,  sell: 2,  grow: 60,  yield: 3, xp: 3,  say: { en: 'This lettuce is fresh and crunchy.', zh: '这棵生菜又新鲜又脆。' } },
+  carrot:     { zh: '胡萝卜', en: 'carrot',     ipa: '/ˈkærət/',     lv: 1, seed: 3,  sell: 3,  grow: 80,  yield: 3, xp: 4,  say: { en: 'Pull up the carrots.', zh: '把胡萝卜拔出来。' } },
+  tomato:     { zh: '番茄',   en: 'tomato',     ipa: '/təˈmeɪtoʊ/',  lv: 1, seed: 4,  sell: 4,  grow: 100, yield: 3, xp: 5,  say: { en: 'The tomatoes are red and ripe.', zh: '番茄又红又熟。' } },
+  potato:     { zh: '土豆',   en: 'potato',     ipa: '/pəˈteɪtoʊ/',  lv: 2, seed: 5,  sell: 4,  grow: 120, yield: 4, xp: 6,  say: { en: 'Dig up the potatoes.', zh: '把土豆挖出来。' } },
+  onion:      { zh: '洋葱',   en: 'onion',      ipa: '/ˈʌnjən/',     lv: 3, seed: 5,  sell: 5,  grow: 120, yield: 3, xp: 6,  say: { en: 'Onions make me cry!', zh: '洋葱让我流眼泪！' } },
+  corn:       { zh: '玉米',   en: 'corn',       ipa: '/kɔːrn/',      lv: 3, seed: 6,  sell: 6,  grow: 150, yield: 3, xp: 8,  say: { en: 'The corn is tall and sweet.', zh: '玉米又高又甜。' } },
+  strawberry: { zh: '草莓',   en: 'strawberry', ipa: '/ˈstrɔːberi/', lv: 4, seed: 8,  sell: 8,  grow: 180, yield: 4, xp: 10, say: { en: 'These strawberries are so sweet.', zh: '这些草莓好甜。' } },
+  pumpkin:    { zh: '南瓜',   en: 'pumpkin',    ipa: '/ˈpʌmpkɪn/',   lv: 5, seed: 12, sell: 16, grow: 240, yield: 2, xp: 14, say: { en: 'What a big pumpkin!', zh: '好大的南瓜！' } },
+};
+const CROP_IDS = Object.keys(CROPS);
+const ITEMS = Object.assign({}, CROPS, { egg: { zh: '鸡蛋', en: 'egg', ipa: '/eɡ/', lv: 1, sell: 3 } });
+const RECIPES = [
+  { id: 'salad', en: 'Garden Salad', zh: '田园沙拉', lv: 1, price: 20, need: { lettuce: 2, tomato: 1 }, p: 'a garden salad', steps: [
+    { en: 'Wash the lettuce.', zh: '把生菜洗干净。', v: 'Wash', act: 'wash', ing: 'lettuce' },
+    { en: 'Tear the lettuce into small pieces.', zh: '把生菜撕成小块。', v: 'Tear', act: 'tear', ing: 'lettuce' },
+    { en: 'Slice the tomato.', zh: '把番茄切片。', v: 'Slice', act: 'cut', ing: 'tomato' },
+    { en: 'Toss it with some dressing.', zh: '淋上酱汁拌匀。', v: 'Toss', act: 'mix', ing: 'lettuce' } ] },
+  { id: 'eggtomato', en: 'Tomato and Egg Stir-fry', zh: '番茄炒蛋', lv: 1, price: 32, need: { tomato: 2, egg: 2 }, p: 'the tomato and egg stir-fry', steps: [
+    { en: 'Cut the tomatoes into wedges.', zh: '把番茄切成块。', v: 'Cut', act: 'cut', ing: 'tomato' },
+    { en: 'Crack two eggs into a bowl.', zh: '把两个鸡蛋磕进碗里。', v: 'Crack', act: 'crack', ing: 'egg' },
+    { en: 'Beat the eggs well.', zh: '把鸡蛋充分打散。', v: 'Beat', act: 'mix', ing: 'egg' },
+    { en: 'Heat some oil in the wok.', zh: '锅里放油烧热。', v: 'Heat', act: 'heat', ing: null },
+    { en: 'Scramble the eggs, then add the tomatoes.', zh: '先炒鸡蛋，再加番茄。', v: 'Scramble', act: 'fry', ing: 'tomato' },
+    { en: 'Add a pinch of salt and sugar.', zh: '加一小撮盐和糖。', v: 'Add', act: 'season', ing: null } ] },
+  { id: 'carrots', en: 'Honey Glazed Carrots', zh: '蜂蜜胡萝卜', lv: 2, price: 26, need: { carrot: 3 }, p: 'the honey glazed carrots', steps: [
+    { en: 'Peel the carrots.', zh: '给胡萝卜削皮。', v: 'Peel', act: 'peel', ing: 'carrot' },
+    { en: 'Cut them into sticks.', zh: '切成条。', v: 'Cut', act: 'cut', ing: 'carrot' },
+    { en: 'Melt some butter in a pan.', zh: '在平底锅里化开黄油。', v: 'Melt', act: 'heat', ing: null },
+    { en: 'Add the carrots and a spoon of honey.', zh: '放入胡萝卜和一勺蜂蜜。', v: 'Add', act: 'fry', ing: 'carrot' },
+    { en: 'Cook until they are soft and shiny.', zh: '煮到软嫩发亮。', v: 'Cook', act: 'fry', ing: 'carrot' } ] },
+  { id: 'mash', en: 'Mashed Potatoes', zh: '土豆泥', lv: 2, price: 28, need: { potato: 3 }, p: 'some mashed potatoes', steps: [
+    { en: 'Peel the potatoes.', zh: '给土豆削皮。', v: 'Peel', act: 'peel', ing: 'potato' },
+    { en: 'Boil them for fifteen minutes.', zh: '煮十五分钟。', v: 'Boil', act: 'boil', ing: 'potato' },
+    { en: 'Drain the water.', zh: '把水沥干。', v: 'Drain', act: 'pour', ing: null },
+    { en: 'Mash them with a fork.', zh: '用叉子压成泥。', v: 'Mash', act: 'mash', ing: 'potato' },
+    { en: 'Stir in some butter and milk.', zh: '拌入黄油和牛奶。', v: 'Stir', act: 'mix', ing: 'potato' } ] },
+  { id: 'cornsoup', en: 'Creamy Corn Soup', zh: '玉米浓汤', lv: 3, price: 36, need: { corn: 2, potato: 1 }, p: 'a bowl of corn soup', steps: [
+    { en: 'Cut the corn off the cob.', zh: '把玉米粒切下来。', v: 'Cut', act: 'cut', ing: 'corn' },
+    { en: 'Dice the potato.', zh: '把土豆切丁。', v: 'Dice', act: 'cut', ing: 'potato' },
+    { en: 'Boil them in a pot of water.', zh: '放进一锅水里煮。', v: 'Boil', act: 'boil', ing: 'corn' },
+    { en: 'Blend the soup until it is smooth.', zh: '把汤打到顺滑。', v: 'Blend', act: 'blend', ing: 'corn' },
+    { en: 'Season it with salt and pepper.', zh: '用盐和胡椒调味。', v: 'Season', act: 'season', ing: null } ] },
+  { id: 'onionsoup', en: 'French Onion Soup', zh: '法式洋葱汤', lv: 3, price: 38, need: { onion: 3 }, p: 'a bowl of onion soup', steps: [
+    { en: 'Slice the onions thinly.', zh: '把洋葱切成细丝。', v: 'Slice', act: 'cut', ing: 'onion' },
+    { en: 'Cook them slowly until golden brown.', zh: '小火慢炒到金黄。', v: 'Cook', act: 'fry', ing: 'onion' },
+    { en: 'Pour in the beef broth.', zh: '倒入牛肉高汤。', v: 'Pour', act: 'pour', ing: null },
+    { en: 'Let it simmer for twenty minutes.', zh: '小火炖二十分钟。', v: 'simmer', act: 'boil', ing: 'onion' },
+    { en: 'Top it with bread and cheese.', zh: '铺上面包和芝士。', v: 'Top', act: 'serve', ing: null } ] },
+  { id: 'smoothie', en: 'Strawberry Smoothie', zh: '草莓奶昔', lv: 4, price: 34, need: { strawberry: 3 }, p: 'a strawberry smoothie', steps: [
+    { en: 'Wash the strawberries.', zh: '把草莓洗干净。', v: 'Wash', act: 'wash', ing: 'strawberry' },
+    { en: 'Remove the green tops.', zh: '去掉绿色的蒂。', v: 'Remove', act: 'cut', ing: 'strawberry' },
+    { en: 'Put them in the blender with milk.', zh: '和牛奶一起放进搅拌机。', v: 'Put', act: 'blend', ing: 'strawberry' },
+    { en: 'Blend for thirty seconds.', zh: '搅打三十秒。', v: 'Blend', act: 'blend', ing: 'strawberry' },
+    { en: 'Pour it into a tall glass.', zh: '倒进一个高杯子里。', v: 'Pour', act: 'pour', ing: 'strawberry' } ] },
+  { id: 'pie', en: 'Pumpkin Pie', zh: '南瓜派', lv: 5, price: 66, need: { pumpkin: 1, egg: 2 }, p: 'a slice of pumpkin pie', steps: [
+    { en: 'Cut the pumpkin in half.', zh: '把南瓜切成两半。', v: 'Cut', act: 'cut', ing: 'pumpkin' },
+    { en: 'Scoop out the seeds.', zh: '把籽挖出来。', v: 'Scoop', act: 'scoop', ing: 'pumpkin' },
+    { en: 'Steam the pumpkin until soft.', zh: '把南瓜蒸软。', v: 'Steam', act: 'boil', ing: 'pumpkin' },
+    { en: 'Mix it with eggs and sugar.', zh: '加鸡蛋和糖拌匀。', v: 'Mix', act: 'mix', ing: 'egg' },
+    { en: 'Pour the filling into the crust.', zh: '把馅倒进派皮里。', v: 'Pour', act: 'pour', ing: 'pumpkin' },
+    { en: 'Bake it for forty minutes.', zh: '烤四十分钟。', v: 'Bake', act: 'bake', ing: null } ] },
+];
+const RECIPE = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+const VERB_INFO = {
+  wash: ['/wɑːʃ/', '洗'], tear: ['/ter/', '撕'], slice: ['/slaɪs/', '切片'], toss: ['/tɔːs/', '拌'], cut: ['/kʌt/', '切'], crack: ['/kræk/', '磕开'],
+  beat: ['/biːt/', '打（蛋）'], heat: ['/hiːt/', '加热'], scramble: ['/ˈskræmbl/', '炒（蛋）'], add: ['/æd/', '加入'], peel: ['/piːl/', '削皮'],
+  melt: ['/melt/', '融化'], cook: ['/kʊk/', '烹调'], boil: ['/bɔɪl/', '煮'], drain: ['/dreɪn/', '沥干'], mash: ['/mæʃ/', '压成泥'], stir: ['/stɜːr/', '搅拌'],
+  dice: ['/daɪs/', '切丁'], blend: ['/blend/', '搅打'], season: ['/ˈsiːzn/', '调味'], pour: ['/pɔːr/', '倒'], simmer: ['/ˈsɪmər/', '小火炖'],
+  top: ['/tɑːp/', '铺在上面'], remove: ['/rɪˈmuːv/', '去掉'], put: ['/pʊt/', '放'], scoop: ['/skuːp/', '舀出'], steam: ['/stiːm/', '蒸'], mix: ['/mɪks/', '混合'], bake: ['/beɪk/', '烤'],
+};
+// 小馆对话模板：{p} 菜名短语 / {tod} 时段 / {n} 价格
+const T_ORDER = [
+  { en: 'Hi there! Could I have {p}, please?', zh: '你好！可以给我来一份{p}吗？' },
+  { en: "Hello! I'd like {p}, please.", zh: '你好！我想要{p}。' },
+  { en: 'Excuse me, can I get {p}?', zh: '打扰一下，能给我{p}吗？' },
+  { en: "Good {tod}! I'll have {p}, please.", zh: '{todzh}好！我要{p}。' },
+];
+const T_REPLY = [
+  { en: 'Sure! Here you are.', zh: '好的！给你。' },
+  { en: 'Of course. Enjoy your meal!', zh: '当然。请慢用！' },
+  { en: "Here you go. It's fresh from my farm!", zh: '给你。这是我农场里刚收的！' },
+  { en: 'Coming right up!', zh: '马上就好！' },
+];
+const T_ASK = [
+  { en: 'How much is it?', zh: '多少钱？' },
+  { en: 'How much do I owe you?', zh: '我该付多少？' },
+  { en: "What's the price?", zh: '价格是多少？' },
+];
+const T_PRICE = [
+  { en: "It's {n} coins, please.", zh: '一共 {n} 个金币。' },
+  { en: "That's {n} coins.", zh: '{n} 个金币。' },
+  { en: 'That will be {n} coins, please.', zh: '一共是 {n} 个金币。' },
+];
+const T_THANKS = [
+  { en: 'Here you go. Thank you!', zh: '给你钱。谢谢！' },
+  { en: "Yummy! It's delicious!", zh: '好吃！太美味了！' },
+  { en: 'Thanks! See you tomorrow!', zh: '谢谢！明天见！' },
+  { en: 'Wow, it smells great. Thanks!', zh: '哇，好香。谢谢！' },
+];
+const DD_LINES = ["Hi! I'm Doudou.", "Let's grow some veggies!", 'Time to cook!', 'What a sunny day!', 'Good job, farmer!', 'I love fresh tomatoes.'];
+const LV = [0, 40, 110, 220, 380, 600, 900, 1300, 1800, 2500];
+const lvNeed = lv => lv < LV.length ? LV[lv] : LV[LV.length - 1] + (lv - LV.length + 1) * 1000;
+const PLOT_LOCK = { 6: { c: 60, lv: 2 }, 7: { c: 120, lv: 3 }, 8: { c: 200, lv: 4 } };
+const EGG_MS = 75000;
+const QDEF = {
+  harvest: { zh: '收获作物', g: [4, 6] }, care: { zh: '浇水 / 除草 / 捉虫', g: [4, 8] }, egg: { zh: '捡鸡蛋', g: [2, 3] },
+  cook: { zh: '做菜', g: [1, 2] }, serve: { zh: '接待客人', g: [2, 3] }, star3: { zh: '口语拿到三星', g: [3, 5] }, speak: { zh: '开口说英语', g: [8, 12] },
+};
+// 地块：3×3 斜 45° 菱形，(i,j) → 屏幕中心
+const PLOTS = Array.from({ length: 9 }, (_, k) => { const i = Math.floor(k / 3), j = k % 3; return { i, j, x: 80 + (i - j) * 18, y: 64 + (i + j) * 9 }; });
+const PLOT_ORDER = [...PLOTS.keys()].sort((a, b) => PLOTS[a].y - PLOTS[b].y || PLOTS[a].x - PLOTS[b].x);
+
+// ================= 存档 =================
+const SAVE_KEY = 'doudou-farm-kitchen-v1';
+let S = null;
+function newGame() {
+  const plots = Array.from({ length: 9 }, (_, k) => ({ open: k < 6, crop: null, prog: 0, dry: false, weeds: 0, bugs: 0, dead: false }));
+  const g = id => CROPS[id].grow * 1000;
+  Object.assign(plots[0], { crop: 'tomato', prog: g('tomato') });
+  Object.assign(plots[1], { crop: 'lettuce', prog: g('lettuce') * .72, weeds: 1 });
+  Object.assign(plots[2], { crop: 'carrot', prog: g('carrot') * .3, dry: true });
+  Object.assign(plots[3], { crop: 'tomato', prog: g('tomato') * .48, bugs: 1 });
+  plots[5].dead = true;
+  return {
+    v: 1, t: 0, coins: 50, xp: 0, lv: 1, seeds: { lettuce: 3, carrot: 2, tomato: 2 }, inv: { egg: 1, lettuce: 2, tomato: 1 }, dishes: [], plots,
+    nest: { eggs: 1, timer: 0 }, cust: [{ id: 1, who: 'mimi', dish: 'salad' }], custTimer: 30000, nextId: 2, words: {}, q: null,
+    cfg: { zh: true, talk: true, sfx: true, mode: 'auto', rate: .9 }, stats: { harvest: 0, cook: 0, serve: 0, spoken: 0, earned: 0 }, intro: true, last: Date.now(),
+  };
+}
+function fixSave(d) { const b = newGame(); for (const k of Object.keys(b)) if (d[k] === undefined) d[k] = b[k]; d.cfg = Object.assign(b.cfg, d.cfg); d.stats = Object.assign(b.stats, d.stats); return d; }
+function loadLocal() { try { const r = localStorage.getItem(SAVE_KEY); if (!r) return null; const d = JSON.parse(r); return d && d.v === 1 ? fixSave(d) : null; } catch (e) { return null; } }
+function save(touch = true) { if (touch) S.t = Date.now(); try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { } if (touch) pushCloud(); }
+// 在 claude.ai 里打开时，存档另存一份到个人私有空间，换设备也能接着玩
+let CLOUD = null, cloudTimer = 0, cloudBusy = false;
+async function initCloud() {
+  try {
+    if (!window.claude || !window.claude.use) return;
+    const [db, user] = await Promise.all([window.claude.use('db'), window.claude.use('user')]);
+    if (!db || !user) return;
+    const id = await user.id(); if (!id) return;
+    CLOUD = db.doc('data/users/' + id + '/save');
+    const snap = await CLOUD.get();
+    if (snap.exists) {
+      const d = snap.data(), r = d && typeof d.json === 'string' ? JSON.parse(d.json) : null;
+      if (r && r.v === 1 && (r.t || 0) > (S.t || 0)) { S = fixSave(r); simulate(Date.now() - S.last); S.last = Date.now(); save(false); refresh(); toast('已读取云端存档'); }
+    } else if (S.t) pushCloud();
+  } catch (e) { CLOUD = null; }
+}
+function pushCloud(now) {
+  if (!CLOUD) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(async () => {
+    if (cloudBusy) { pushCloud(); return; }
+    cloudBusy = true;
+    try { await CLOUD.set({ json: JSON.stringify(S), t: S.t }); } catch (e) { }
+    cloudBusy = false;
+  }, now ? 0 : 5000);
+}
+
+// ================= 模拟：作物生长、天气事件、母鸡下蛋、客人进门 =================
+const growMs = id => CROPS[id].grow * 1000;
+const stageOf = p => { const f = p.prog / growMs(p.crop); return f >= 1 ? 3 : f >= .5 ? 2 : f >= .2 ? 1 : 0; };
+const plotRate = p => (p.dry ? .5 : 1) * Math.max(.2, 1 - .2 * (p.weeds + p.bugs));
+function simulate(dt) {
+  if (!(dt > 0)) return;
+  const n = Math.max(1, Math.min(Math.round(dt / 1000), 7200)), per = dt / n, pr = Math.min(1, per / 1000);
+  for (let s = 0; s < n; s++) {
+    for (const p of S.plots) {
+      if (!p.open || !p.crop || p.dead) continue;
+      const G = growMs(p.crop);
+      if (p.prog >= G) { p.dry = false; continue; }
+      p.prog = Math.min(G, p.prog + per * plotRate(p));
+      if (p.prog >= G) { p.dry = false; continue; }
+      if (!p.dry && Math.random() < pr / 45) p.dry = true;
+      if (p.weeds < 2 && Math.random() < pr / 70) p.weeds++;
+      if (p.bugs < 2 && Math.random() < pr / 90) p.bugs++;
+    }
+    S.nest.timer += per;
+    while (S.nest.timer >= EGG_MS) { S.nest.timer -= EGG_MS; if (S.nest.eggs < 3) S.nest.eggs++; }
+    S.custTimer -= per;
+    if (S.custTimer <= 0) { S.custTimer = 35000 + Math.random() * 45000; if (S.cust.length < 3) spawnCustomer(); }
+  }
+}
+function spawnCustomer() {
+  const free = Object.keys(CRITTERS).filter(w => !S.cust.some(c => c.who === w)); if (!free.length) return;
+  const who = free[Math.floor(Math.random() * free.length)];
+  const open = RECIPES.filter(r => r.lv <= S.lv), stocked = open.filter(r => dishCount(r.id) > 0);
+  const pool = stocked.length && Math.random() < .6 ? stocked : open;
+  S.cust.push({ id: S.nextId++, who, dish: pool[Math.floor(Math.random() * pool.length)].id });
+}
+const dishCount = id => S.dishes.filter(d => d.id === id).length;
+const canCook = r => Object.entries(r.need).every(([k, n]) => (S.inv[k] || 0) >= n);
+function addTo(o, k, n) { o[k] = (o[k] || 0) + n; if (o[k] <= 0) delete o[k]; }
+function gainXP(n) { S.xp += n; while (S.xp >= lvNeed(S.lv)) { S.lv++; levelUp(S.lv); } }
+function gainCoins(n) { S.coins += n; if (n > 0) S.stats.earned += n; const el = $('#coins'); el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
+function todayKey() { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; }
+function ensureQuests() {
+  const day = todayKey(); if (S.q && S.q.day === day) return;
+  let seed = [...day].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
+  const ids = Object.keys(QDEF), pick = [];
+  while (pick.length < 3) { const id = ids[Math.floor(rnd() * ids.length)]; if (!pick.includes(id)) pick.push(id); }
+  S.q = { day, list: pick.map(id => { const [a, b] = QDEF[id].g; return { id, goal: a + Math.floor(rnd() * (b - a + 1)), n: 0, done: false }; }) };
+}
+function quest(id, n = 1) { if (!S.q) return; for (const q of S.q.list) if (q.id === id && !q.done) q.n = Math.min(q.goal, q.n + n); }
+
+// ================= 声音：音效、朗读、语音识别、打分 =================
+let AC = null;
+function ac() { if (!AC) { try { AC = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { } } if (AC && AC.state === 'suspended') AC.resume(); return AC; }
+function tone(f, d, type = 'square', vol = .05, when = 0, slide = 0) {
+  if (!S || !S.cfg.sfx) return; const a = ac(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + when;
+  o.type = type; o.frequency.setValueAtTime(f, t0); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + d);
+  g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(.0001, t0 + d);
+  o.connect(g).connect(a.destination); o.start(t0); o.stop(t0 + d + .02);
+}
+const SFX = {
+  click: () => tone(880, .03, 'square', .025), pop: () => tone(520, .09, 'square', .05, 0, 900), dig: () => tone(180, .12, 'triangle', .12, 0, 90),
+  water: () => tone(900, .25, 'sine', .07, 0, 300), coin: () => { tone(988, .07); tone(1319, .2, 'square', .05, .07); },
+  harvest: () => [523, 659, 784].forEach((f, i) => tone(f, .1, 'square', .045, i * .06)), bad: () => tone(240, .22, 'square', .04, 0, 150),
+  lvl: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .16, 'square', .045, i * .09)),
+  star: n => [660, 880, 1100].slice(0, Math.max(1, n)).forEach((f, i) => tone(f, .12, 'square', .045, i * .1)),
+  chop: () => tone(140, .06, 'square', .06, 0, 70), sizzle: () => tone(2400, .25, 'sawtooth', .015, 0, 1800),
+};
+let VOICE = null;
+function pickVoice() {
+  if (!('speechSynthesis' in window)) return;
+  const en = speechSynthesis.getVoices().filter(v => /^en[-_]/i.test(v.lang));
+  VOICE = ['Samantha', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny', 'Ava', 'Allison', 'Alex'].map(n => en.find(v => v.name.includes(n))).find(Boolean) || en.find(v => /en[-_]US/i.test(v.lang)) || en[0] || null;
+}
+if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
+function say(text, o = {}) {
+  if (!('speechSynthesis' in window)) { toast('这个浏览器不支持朗读'); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; if (VOICE) u.voice = VOICE;
+    u.rate = o.slow ? .62 : S.cfg.rate; u.pitch = o.pitch || 1; speechSynthesis.speak(u);
+  } catch (e) { }
+}
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let srBroken = false, REC = null;
+const canListen = () => !!SR && !srBroken && S.cfg.mode !== 'self';
+function listen(onInterim) {
+  return new Promise((resolve, reject) => {
+    let r; try { r = new SR(); } catch (e) { reject('start'); return; }
+    REC = r; r.lang = 'en-US'; r.interimResults = true; r.maxAlternatives = 5; r.continuous = false;
+    let alts = [], err = null, settled = false, heardAudio = false;
+    const finish = () => { if (settled) return; settled = true; clearTimeout(timer); clearTimeout(hard); clearTimeout(noMic); REC = null; if (alts.length) resolve(alts); else reject(err || 'no-speech'); };
+    // 有的环境（被禁用的 iframe、无声卡的机器）既不报错也不开始录音：8 秒还没收到声音就放弃
+    r.onaudiostart = r.onsoundstart = () => { heardAudio = true; };
+    const noMic = setTimeout(() => { if (!heardAudio && !alts.length) { err = 'no-audio'; try { r.abort(); } catch (e) { } finish(); } }, 8000);
+    const timer = setTimeout(() => { try { r.stop(); } catch (e) { } }, 10000);
+    const hard = setTimeout(() => { try { r.abort(); } catch (e) { } finish(); }, 12500);
+    r.onresult = e => {
+      const res = Array.from(e.results), k = Math.max(...res.map(x => x.length)), list = [];
+      for (let a = 0; a < k; a++) list.push(res.map(x => x[Math.min(a, x.length - 1)].transcript).join(' ').trim());
+      alts = [...new Set(list)].filter(Boolean); if (onInterim && alts[0]) onInterim(alts[0]);
+    };
+    r.onerror = e => { err = e.error || 'error'; };
+    r.onend = finish;
+    try { r.start(); } catch (e) { err = 'start'; finish(); }
+  });
+}
+function stopListen() { try { if (REC) REC.stop(); } catch (e) { } }
+// 打分：把目标句与识别结果都规整成单词序列，做加权最长公共子序列
+const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+function numWords(n) { if (n < 20) return ONES[n]; if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? ' ' + ONES[n % 10] : ''); if (n < 1000) return ONES[Math.floor(n / 100)] + ' hundred' + (n % 100 ? ' ' + numWords(n % 100) : ''); return String(n); }
+const CONTR = { "it's": 'it is', "i'm": 'i am', "i'd": 'i would', "i'll": 'i will', "that's": 'that is', "here's": 'here is', "what's": 'what is', "they're": 'they are', "we're": 'we are', "you're": 'you are', "let's": 'let us', "don't": 'do not', "can't": 'can not', cannot: 'can not', "won't": 'will not', "isn't": 'is not', "aren't": 'are not', "there's": 'there is', "we'll": 'we will', "i've": 'i have', "it'll": 'it will', "you'll": 'you will', "he's": 'he is', "she's": 'she is', okay: 'ok' };
+function normWords(s) {
+  s = String(s).toLowerCase().replace(/[‘’`]/g, "'").replace(/\b\d+\b/g, m => numWords(+m));
+  s = s.replace(/[a-z']+/g, w => CONTR[w] || w).replace(/-/g, ' ').replace(/[^a-z0-9' ]/g, ' ').replace(/'/g, '');
+  return s.split(/\s+/).filter(Boolean);
+}
+const stem = w => w.endsWith('ies') ? w.slice(0, -3) + 'y' : /(s|x|z|ch|sh|o)es$/.test(w) ? w.slice(0, -2) : w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w;
+function lev(a, b) { const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i, ...Array(n).fill(0)]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; }
+function sim(a, b) { if (a === b) return 1; if (a.length > 2 && b.length > 2 && stem(a) === stem(b)) return .8; if (Math.min(a.length, b.length) >= 4 && lev(a, b) <= 1) return .6; return 0; }
+const tokensOf = en => en.split(/\s+/).filter(Boolean);
+function scoreSpeech(target, heard) {
+  const toks = tokensOf(target), tw = [], owner = [];
+  toks.forEach((t, i) => normWords(t).forEach(w => { tw.push(w); owner.push(i); }));
+  const hw = normWords(heard), n = tw.length, m = hw.length;
+  const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) { let v = Math.max(dp[i - 1][j], dp[i][j - 1]); const s = sim(tw[i - 1], hw[j - 1]); if (s > 0) v = Math.max(v, dp[i - 1][j - 1] + s); dp[i][j] = v; }
+  const got = Array(n).fill(0); let i = n, j = m;
+  while (i > 0 && j > 0) { const s = sim(tw[i - 1], hw[j - 1]); if (s > 0 && Math.abs(dp[i][j] - (dp[i - 1][j - 1] + s)) < 1e-9) { got[i - 1] = s; i--; j--; } else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--; }
+  const score = n ? Math.round(100 * got.reduce((a, b) => a + b, 0) / n) : 0;
+  const marks = toks.map((_, ti) => { const ks = owner.map((o, k) => o === ti ? k : -1).filter(k => k >= 0); return ks.length ? Math.min(...ks.map(k => got[k])) : 1; });
+  return { score, marks };
+}
+const starsOf = sc => sc >= 85 ? 3 : sc >= 60 ? 2 : sc >= 35 ? 1 : 0;
+function credit(key, score) { const w = S.words[key] || (S.words[key] = { b: 0, n: 0 }); w.n++; w.b = Math.max(w.b, score); }
+
+// ================= 界面小工具 =================
+const $ = s => document.querySelector(s);
+function h(html) { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; }
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+const fill = (s, o) => s.replace(/\{(\w+)\}/g, (_, k) => o[k] !== undefined ? o[k] : '');
+const fmtT = s => { s = Math.max(0, Math.ceil(s)); return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s} 秒`; };
+function toast(msg) { const t = h(`<div class="toast"></div>`); t.textContent = msg; $('#toasts').append(t); setTimeout(() => t.remove(), 2900); }
+function openLayer(node, { full = false, center = false, onClose } = {}) {
+  const L = h(`<div class="layer${full ? ' full' : ''}${center ? ' center' : ''}"><div class="sheet px" role="dialog" aria-modal="true"></div></div>`);
+  L.querySelector('.sheet').append(node); $('#layers').append(L);
+  L.close = () => { if (!L.isConnected) return; L.remove(); if (onClose) onClose(); refresh(); };
+  if (!full) L.addEventListener('click', e => { if (e.target === L) L.close(); });
+  return L;
+}
+function fx(text, lx, ly, cls = '') {
+  const el = h(`<div class="float ${cls}"></div>`); el.textContent = text;
+  el.style.left = Math.max(12, Math.min(88, lx / 160 * 100)) + '%'; el.style.top = (ly / 150 * 100) + '%';
+  $('#farmFx').append(el); setTimeout(() => el.remove(), cls === 'say' ? 2700 : 1300);
+}
+
+// ================= 口语卡：听 / 慢速 / 说 → 逐词标色 + 星级 =================
+function speakCard(item, { onResult, pitch = 1 } = {}) {
+  const toks = tokensOf(item.en), vs = item.v ? item.v.toLowerCase() : null, vstem = vs ? (vs.length > 4 ? vs.slice(0, -1) : vs) : null;
+  const isV = t => vstem && t.toLowerCase().replace(/[^a-z]/g, '').startsWith(vstem);
+  const el = h(`<div class="speak">
+    <div class="sp-en" lang="en">${toks.map((t, i) => `<span class="w${isV(t) ? ' v' : ''}" data-i="${i}">${esc(t)}</span>`).join('')}</div>
+    ${S.cfg.zh && item.zh ? `<div class="sp-zh">${esc(item.zh)}${item.ipa ? ` <span class="ipa">${esc(item.ipa)}</span>` : ''}</div>` : ''}
+    <div class="sp-row">
+      <button class="btn blue" type="button" data-a="say">${uiImg('spk')}听</button>
+      <button class="btn blue" type="button" data-a="slow">慢速</button>
+      <button class="btn red mic" type="button" data-a="mic">${uiImg('mic')}<span>说</span></button>
+    </div>
+    <div class="sp-self" hidden><p>先听一遍，再大声跟读，然后给自己打个分：</p><div class="row"><button class="btn ghost sm" type="button" data-s="45">不太顺</button><button class="btn ghost sm" type="button" data-s="72">还可以</button><button class="btn ghost sm" type="button" data-s="92">很流利</button></div></div>
+    <div class="sp-heard" aria-live="polite"></div>
+    <div class="sp-res" aria-live="polite"></div>
+  </div>`);
+  const mic = el.querySelector('[data-a=mic]'), micL = mic.querySelector('span'), heard = el.querySelector('.sp-heard'), res = el.querySelector('.sp-res'), selfBox = el.querySelector('.sp-self');
+  const words = [...el.querySelectorAll('.sp-en .w')];
+  let best = null, listening = false, tries = 0;
+  const label = () => { micL.textContent = !canListen() ? '我读完了' : listening ? '在听…再点结束' : tries ? '再说一次' : '说'; };
+  label();
+  el.querySelector('[data-a=say]').onclick = () => say(item.en, { pitch });
+  el.querySelector('[data-a=slow]').onclick = () => say(item.en, { slow: true, pitch });
+  function result(score, marks) {
+    tries++;
+    words.forEach((w, i) => { w.classList.remove('ok', 'part', 'miss'); if (marks) w.classList.add(marks[i] >= 1 ? 'ok' : marks[i] > 0 ? 'part' : 'miss'); });
+    const st = starsOf(score);
+    res.innerHTML = `${starsHTML(st, 3)}<span>${['再来一次', '加油', '不错', '完美！'][st]} · ${score} 分</span>`;
+    SFX[st >= 2 ? 'star' : 'bad'](st);
+    if (tries === 1) { gainXP(st >= 3 ? 3 : st >= 2 ? 2 : 1); S.stats.spoken++; quest('speak'); }
+    if (st >= 3) quest('star3');
+    credit(item.k || item.en, score);
+    if (marks && item.v) { const vi = toks.findIndex(isV); if (vi >= 0 && marks[vi] >= .8) credit(vs, 90); }
+    if (!best || score > best.score) best = { score, stars: st };
+    save(); refreshHUD();
+    if (onResult) onResult(best);
+  }
+  selfBox.addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) result(+b.dataset.s, null); });
+  mic.onclick = async () => {
+    ac();
+    if (!canListen()) { selfBox.hidden = false; return; }
+    if (listening) { stopListen(); return; }
+    if ('speechSynthesis' in window) speechSynthesis.cancel();
+    listening = true; mic.classList.add('on'); label(); heard.textContent = '请大声说英文…';
+    try {
+      const alts = await listen(t => { heard.textContent = '听到：' + t; });
+      const scored = alts.map(a => ({ a, ...scoreSpeech(item.en, a) })).sort((x, y) => y.score - x.score)[0];
+      heard.textContent = '听到：' + scored.a;
+      result(scored.score, scored.marks);
+    } catch (err) {
+      if (['not-allowed', 'service-not-allowed', 'audio-capture', 'network', 'start', 'language-not-supported'].includes(err)) {
+        srBroken = true; heard.textContent = ''; selfBox.hidden = false;
+        toast('这里用不了麦克风识别，已切换为跟读自评');
+      } else if (err === 'no-audio') { heard.textContent = '麦克风没有启动。可以再点一次，或者先用下面的自评。'; selfBox.hidden = false; }
+      else heard.textContent = err === 'no-speech' ? '没听到声音，靠近手机再说一次。' : '识别中断了，再试一次。';
+    } finally { listening = false; mic.classList.remove('on'); label(); }
+  };
+  if (!canListen()) selfBox.hidden = false;
+  return { el, get best() { return best; } };
+}
+
+// ================= 农场 =================
+const DD = { x: 70, tx: 70, face: 1, hop: 0, next: 0 };
+const HEN = { x: 146, dir: -1, wait: 0 };
+const PT = [];
+let farmCv, FG, sel = -1, selT = 0;
+function todPhase(d = new Date()) { const h = d.getHours() + d.getMinutes() / 60; return h < 5 || h >= 20 ? 'night' : h < 7 ? 'dawn' : h < 17 ? 'day' : 'dusk'; }
+const SKY = { day: ['#6ec0ee', '#c8ecff'], dawn: ['#7a8ed0', '#ffc8a0'], dusk: ['#5a5aa0', '#ff9a70'], night: ['#141a38', '#34356a'] };
+function farmBg(ph) {
+  return spr('fbg:' + ph, () => {
+    const [c, g] = mk(160, 150), [s1, s2] = SKY[ph];
+    skyFill(g, 0, 0, 160, 44, s1, s2, 6);
+    if (ph === 'night') for (let i = 0; i < 34; i++) P(g, Math.floor(hash(i) * 160), Math.floor(hash(i + 50) * 30), i % 3 ? '#c8d0ff' : '#ffffff');
+    for (let x = 0; x < 160; x++) {
+      const h1 = Math.round(30 + Math.sin(x * .045) * 4 + Math.sin(x * .11 + 1) * 2); R(g, x, h1, 1, 44 - h1, '#93cf74');
+      const h2 = Math.round(37 + Math.sin(x * .07 + 2) * 2.5); R(g, x, h2, 1, 44 - h2, '#78bd5a');
+    }
+    R(g, 0, 42, 160, 108, C.grass);
+    for (let i = 0; i < 260; i++) { const x = Math.floor(hash(i * 3.1) * 160), y = 42 + Math.floor(hash(i * 7.7) * 108); P(g, x, y, i % 2 ? C.grass3 : C.grass2); if (i % 5 === 0) P(g, x, y - 1, C.grass3); }
+    R(g, 0, 115, 160, 2, C.wood3); R(g, 0, 119, 160, 2, C.wood3); R(g, 0, 117, 160, 1, C.wood2); R(g, 0, 121, 160, 1, C.wood2);
+    for (let x = 2; x < 160; x += 12) { R(g, x, 112, 3, 11, C.wood); R(g, x, 112, 3, 1, C.wood3); R(g, x + 2, 113, 1, 10, C.wood2); }
+    R(g, 0, 124, 160, 15, '#dcbc88'); R(g, 0, 124, 160, 1, '#b8955e'); R(g, 0, 138, 160, 1, '#b8955e');
+    for (let i = 0; i < 50; i++) P(g, Math.floor(hash(i + 9) * 160), 126 + Math.floor(hash(i + 19) * 11), '#c8a670');
+    for (let i = 0; i < 14; i++) { const x = Math.floor(hash(i + 70) * 156) + 2, y = 141 + Math.floor(hash(i + 90) * 7); P(g, x, y, ['#ffffff', '#f6d54a', '#f48ab8'][i % 3]); P(g, x, y + 1, C.grass2); }
+    g.drawImage(houseSpr(), 3, 13); g.drawImage(coopSpr(), 127, 33); g.drawImage(treeSpr(), 136, 83); g.drawImage(bushSpr(), 2, 98);
+    return c;
+  });
+}
+function drawFarm(t) {
+  const g = FG, now = new Date(), ph = todPhase(now), hr = now.getHours() + now.getMinutes() / 60;
+  g.drawImage(farmBg(ph), 0, 0);
+  // 太阳 / 月亮 / 云（只画在山后面的天空里）
+  g.save(); g.beginPath(); g.rect(0, 0, 160, 31); g.clip();
+  if (ph === 'night') { const f = ((hr + 24 - 20) % 24) / 9, mx = 8 + f * 144, my = 27 - Math.sin(Math.PI * f) * 18; E(g, mx, my, 4, 4, '#f4f0d8'); E(g, mx + 2, my - 1, 3.4, 3.4, SKY.night[0]); }
+  else { const f = Math.min(1, Math.max(0, (hr - 5) / 15)), sx = 8 + f * 144, sy = 30 - Math.sin(Math.PI * f) * 24; E(g, sx, sy, 5, 5, ph === 'day' ? '#ffe27a' : '#ffb070'); E(g, sx, sy, 3.6, 3.6, '#fff3b0'); }
+  g.globalAlpha = ph === 'night' ? .25 : .95;
+  [[0, 5, .0021], [90, 14, .0016], [160, 3, .0012]].forEach(([o, y, v]) => g.drawImage(cloudSpr(), Math.round(((t * v + o) % 200) - 24), y));
+  g.restore();
+  // 地块
+  for (const k of PLOT_ORDER) { const p = S.plots[k], q = PLOTS[k]; g.drawImage(soilSpr(!p.open ? 'lock' : p.crop && !p.dry && !p.dead ? 'wet' : 'dry'), q.x - 20, q.y - 10); }
+  if (sel >= 0 && t - selT < 400) { const q = PLOTS[sel]; g.globalAlpha = .35; g.drawImage(soilSpr('lock'), q.x - 20, q.y - 11); g.globalAlpha = 1; }
+  for (const k of PLOT_ORDER) {
+    const p = S.plots[k], q = PLOTS[k];
+    if (!p.open) { g.drawImage(lockSpr(), q.x - 4, q.y - 6); continue; }
+    if (p.weeds > 0) g.drawImage(weedSpr(), q.x - 14, q.y - 5);
+    if (p.weeds > 1) g.drawImage(weedSpr(), q.x + 4, q.y - 1);
+    if (p.dead) { g.drawImage(deadSpr(), q.x - 11, q.y - 22); continue; }
+    if (!p.crop) continue;
+    const st = stageOf(p), sway = st === 3 ? Math.round(Math.sin(t / 600 + k) * .6) : 0;
+    g.drawImage(cropSpr(p.crop, st), q.x - 11 + sway, q.y - 22);
+    if (st === 3) { const ph2 = (t / 900 + k * .37) % 1; if (ph2 < .5) { const sx = q.x - 8 + Math.floor(hash(k + Math.floor(t / 900)) * 16), sy = q.y - 14 - Math.floor(hash(k * 3 + Math.floor(t / 900)) * 10); P(g, sx, sy, '#ffffff'); if (ph2 < .25) { P(g, sx - 1, sy, '#fff6b0'); P(g, sx + 1, sy, '#fff6b0'); P(g, sx, sy - 1, '#fff6b0'); P(g, sx, sy + 1, '#fff6b0'); } } }
+    for (let b = 0; b < p.bugs; b++) { const a = t / 700 + k + b * 3, bx = Math.round(q.x + Math.cos(a) * 9), by = Math.round(q.y + Math.sin(a) * 3.5), f = (t / 150 | 0) % 2; R(g, bx - 1, by - 1, 4, 3, C.ink); R(g, bx, by, 2, 1, '#e04848'); P(g, bx + (f ? -2 : 3), by + 1, C.ink); P(g, bx + (f ? 3 : -2), by, C.ink); }
+    if (p.dry && st < 3) g.drawImage(dropSpr(), q.x + 4, q.y - 31 + Math.round(Math.sin(t / 300)));
+  }
+  // 鸡窝与母鸡
+  E(g, 141, 63, 7, 2.6, '#a87830'); E(g, 141, 62, 6, 2, '#e8c060'); L(g, 136, 62, 146, 62, '#c89a40');
+  for (let i = 0; i < S.nest.eggs; i++) g.drawImage(eggSmall(), 135 + i * 4, 57);
+  if (HEN.wait > 0) HEN.wait--; else { HEN.x += HEN.dir * .18; if (HEN.x < 129 || HEN.x > 155) { HEN.dir *= -1; HEN.wait = 40 + Math.random() * 80 | 0; } }
+  const hf = HEN.wait > 0 ? 0 : (t / 200 | 0) % 2;
+  g.save(); if (HEN.dir < 0) { g.translate(Math.round(HEN.x) + 7, 0); g.scale(-1, 1); g.drawImage(henSpr(hf), 0, 60); } else g.drawImage(henSpr(hf), Math.round(HEN.x) - 7, 60); g.restore();
+  // 豆豆在小路上走来走去
+  if (t > DD.next && Math.abs(DD.tx - DD.x) < 1) { DD.tx = 18 + Math.random() * 124; DD.next = t + 3000 + Math.random() * 5000; }
+  const mv = Math.abs(DD.tx - DD.x) >= 1; if (mv) { DD.face = DD.tx > DD.x ? 1 : -1; DD.x += DD.face * .55; }
+  const df = mv ? (t / 160 | 0) % 2 : (t / 600 | 0) % 2, hy = DD.hop > 0 ? -Math.round(Math.sin(DD.hop * Math.PI) * 6) : 0; DD.hop = Math.max(0, DD.hop - .07);
+  g.save(); if (DD.face < 0) { g.translate(Math.round(DD.x) + 10, 0); g.scale(-1, 1); g.drawImage(ddSpr('farm', df), 0, 111 + hy); } else g.drawImage(ddSpr('farm', df), Math.round(DD.x) - 10, 111 + hy); g.restore();
+  // 粒子
+  for (let i = PT.length - 1; i >= 0; i--) { const p = PT[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; if (--p.life <= 0) { PT.splice(i, 1); continue; } R(g, p.x, p.y, p.s, p.s, p.col); }
+  // 黄昏 / 夜晚：整体压暗，屋里亮灯，萤火虫
+  if (ph !== 'day') {
+    g.save(); g.globalCompositeOperation = 'multiply'; g.fillStyle = { night: '#5a62a8', dusk: '#f2bca8', dawn: '#dccbe8' }[ph]; g.fillRect(0, 31, 160, 119); g.restore();
+    if (ph !== 'dawn') {
+      R(g, 11, 33, 9, 8, '#ffd870'); R(g, 15, 33, 1, 8, C.wood2); R(g, 11, 36, 9, 1, C.wood2);
+      if (ph === 'night') for (let i = 0; i < 6; i++) { const fx2 = 20 + hash(i) * 120 + Math.sin(t / 900 + i) * 6, fy = 50 + hash(i + 9) * 70 + Math.cos(t / 700 + i * 2) * 4; if (Math.sin(t / 400 + i * 1.7) > -.2) P(g, fx2, fy, '#f6ff9a'); }
+    }
+  }
+}
+function burst(x, y, col, n = 8, up = 1.2) { for (let i = 0; i < n; i++) PT.push({ x, y, vx: (Math.random() - .5) * 1.4, vy: -Math.random() * up - .3, g: .08, life: 18 + Math.random() * 10 | 0, col, s: 1 }); }
+function plotAt(lx, ly) {
+  const order = [...PLOT_ORDER].reverse();
+  for (const k of order) { const q = PLOTS[k]; if (Math.abs(lx - q.x) / 18 + Math.abs(ly - q.y) / 9 <= 1.05) return k; }
+  for (const k of order) { const q = PLOTS[k], p = S.plots[k]; if ((p.crop || p.dead) && Math.abs(lx - q.x) <= 9 && ly <= q.y && ly >= q.y - 24) return k; }
+  return -1;
+}
+function onFarmTap(e) {
+  ac();
+  const r = farmCv.getBoundingClientRect(), lx = (e.clientX - r.left) * 160 / r.width, ly = (e.clientY - r.top) * 150 / r.height;
+  if (Math.abs(lx - 141) < 11 && ly > 50 && ly < 72) return tapNest();
+  if (Math.abs(lx - DD.x) < 9 && ly > 108 && ly < 138) { const line = DD_LINES[Math.floor(Math.random() * DD_LINES.length)]; DD.hop = 1; fx(line, DD.x, 104, 'say'); say(line, { pitch: 1.3 }); return; }
+  const k = plotAt(lx, ly); if (k >= 0) tapPlot(k);
+}
+function tapNest() {
+  if (S.nest.eggs > 0) {
+    const n = S.nest.eggs; S.nest.eggs = 0; addTo(S.inv, 'egg', n); quest('egg', n); gainXP(n); SFX.harvest(); fx(`+${n} 鸡蛋`, 141, 54); burst(141, 58, '#fffaf0', 6); save(); refresh();
+  } else fx(`母鸡下蛋中 · ${fmtT((EGG_MS - S.nest.timer) / 1000)}`, 141, 56, 'info');
+}
+function tapPlot(k) {
+  const p = S.plots[k], q = PLOTS[k]; sel = k; selT = performance.now();
+  if (!p.open) return unlockPlot(k);
+  DD.tx = Math.max(18, Math.min(142, q.x)); DD.hop = 1;
+  if (p.dead) { p.dead = false; gainXP(1); fx('清理 +1 XP', q.x, q.y - 6); SFX.dig(); burst(q.x, q.y, C.soil2, 8); save(); refresh(); return; }
+  if (!p.crop) return pickSeed(k);
+  if (p.bugs > 0) { p.bugs--; gainXP(2); gainCoins(1); quest('care'); fx('捉虫 +2 XP', q.x, q.y - 12); SFX.pop(); burst(q.x, q.y - 2, '#e04848', 5); save(); refresh(); return; }
+  if (p.weeds > 0) { p.weeds--; gainXP(2); quest('care'); fx('除草 +2 XP', q.x, q.y - 12); SFX.pop(); burst(q.x, q.y - 2, C.leaf, 7); save(); refresh(); return; }
+  if (p.prog >= growMs(p.crop)) return harvest(k);
+  if (p.dry) { p.dry = false; gainXP(1); quest('care'); fx('浇水 +1 XP', q.x, q.y - 12); SFX.water(); for (let i = 0; i < 10; i++) PT.push({ x: q.x - 8 + Math.random() * 16, y: q.y - 26 - Math.random() * 6, vx: 0, vy: .6 + Math.random() * .5, g: .05, life: 22, col: C.water, s: 1 }); save(); refresh(); return; }
+  fx(`${CROPS[p.crop].zh} · 还要 ${fmtT((growMs(p.crop) - p.prog) / plotRate(p) / 1000)}`, q.x, q.y - 14, 'info');
+}
+function harvest(k) {
+  const p = S.plots[k], q = PLOTS[k], id = p.crop, c = CROPS[id], n = c.yield;
+  Object.assign(p, { crop: null, prog: 0, dry: false, weeds: 0, bugs: 0, dead: true });
+  addTo(S.inv, id, n); gainXP(c.xp); S.stats.harvest++; quest('harvest');
+  fx(`+${n} ${c.zh}`, q.x, q.y - 14); SFX.harvest(); burst(q.x, q.y - 10, '#fff6b0', 10, 1.6); save(); refresh();
+  if (S.cfg.talk) harvestTalk(id, n);
+}
+function harvestTalk(id, n) {
+  const c = CROPS[id];
+  const node = h(`<div class="list">
+    <div class="row" style="flex-wrap:nowrap">${itemImg(id, 4)}<div><h3>收获 ${n} 个${c.zh}！</h3><p class="lead">把这句英文说出来，说得好再多拿 1～2 个。</p></div></div>
+    <div class="slot"></div>
+    <div class="row end"><button class="btn ghost" type="button" data-a="skip">直接收下</button><button class="btn green" type="button" data-a="ok" disabled>说完领奖励</button></div>
+  </div>`);
+  const ok = node.querySelector('[data-a=ok]');
+  const card = speakCard({ k: c.say.en, en: c.say.en, zh: c.say.zh, v: c.en }, { onResult: r => { ok.disabled = false; ok.textContent = r.stars >= 3 ? '领取 +2' : r.stars >= 2 ? '领取 +1' : '领取（+0）'; } });
+  node.querySelector('.slot').append(card.el);
+  const L = openLayer(node, { onClose: () => speechSynthesis && speechSynthesis.cancel() });
+  node.querySelector('[data-a=skip]').onclick = () => L.close();
+  ok.onclick = () => { const b = card.best ? (card.best.stars >= 3 ? 2 : card.best.stars >= 2 ? 1 : 0) : 0; if (b) { addTo(S.inv, id, b); toast(`口语奖励：再得 ${b} 个${c.zh}`); SFX.coin(); } save(); L.close(); };
+  say(c.say.en);
+}
+function pickSeed(k) {
+  const owned = CROP_IDS.filter(id => S.seeds[id] > 0);
+  const node = h(`<div class="list"><h3>种点什么？</h3>${owned.length ? '' : '<p class="lead">没有种子了，去种子店买一些吧。</p>'}
+    ${owned.map(id => { const c = CROPS[id]; return `<button class="li btn ghost" type="button" data-id="${id}" style="text-align:left">${im('crop:' + id + ':3', cropSpr(id, 3), 2)}<span><b>${c.zh} <span lang="en">${c.en}</span></b><br><span class="meta">${fmtT(c.grow)} 成熟 · 收 ${c.yield} 个</span></span><span>×${S.seeds[id]}</span></button>`; }).join('')}
+    <div class="row end"><button class="btn" type="button" data-a="shop">去种子店</button></div></div>`);
+  const L = openLayer(node);
+  node.addEventListener('click', e => {
+    const b = e.target.closest('[data-id]'); if (b) { plant(k, b.dataset.id); L.close(); return; }
+    if (e.target.closest('[data-a=shop]')) { L.close(); openShop(); }
+  });
+}
+function plant(k, id) {
+  if (!S.seeds[id]) return; addTo(S.seeds, id, -1);
+  Object.assign(S.plots[k], { crop: id, prog: 0, dry: false, weeds: 0, bugs: 0, dead: false });
+  gainXP(1); SFX.dig(); fx(`种下${CROPS[id].zh}`, PLOTS[k].x, PLOTS[k].y - 8); burst(PLOTS[k].x, PLOTS[k].y, C.soil2, 6); save(); refresh();
+}
+function unlockPlot(k) {
+  const L0 = PLOT_LOCK[k], okLv = S.lv >= L0.lv, okC = S.coins >= L0.c;
+  const node = h(`<div class="list"><h3>开垦这块地</h3><p class="lead">需要 Lv ${L0.lv}，花费 ${L0.c} 金币。${!okLv ? `你现在 Lv ${S.lv}，再升几级再来。` : !okC ? '金币还不够，去小馆多卖几道菜吧。' : ''}</p>
+    <div class="row end"><button class="btn ghost" type="button" data-a="x">算了</button><button class="btn green" type="button" data-a="ok"${okLv && okC ? '' : ' disabled'}>${uiImg('coin')}${L0.c} 开垦</button></div></div>`);
+  const L = openLayer(node, { center: true });
+  node.querySelector('[data-a=x]').onclick = () => L.close();
+  node.querySelector('[data-a=ok]').onclick = () => { S.coins -= L0.c; S.plots[k].open = true; gainXP(5); SFX.coin(); burst(PLOTS[k].x, PLOTS[k].y, C.soil2, 12); save(); L.close(); toast('新地块开好了'); };
+}
+function openShop() {
+  const node = h(`<div class="list"><h3>种子店</h3><p class="lead">种子越贵，长得越慢，但能做的菜更值钱。</p><div class="list" data-s></div><div class="sec">土地</div><div class="list" data-l></div><div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button></div></div>`);
+  const L = openLayer(node);
+  const draw = () => {
+    node.querySelector('[data-s]').innerHTML = CROP_IDS.map(id => {
+      const c = CROPS[id], lock = c.lv > S.lv;
+      return `<div class="li${lock ? ' off' : ''}">${im('crop:' + id + ':3', cropSpr(id, 3), 2)}<span><b>${c.zh} <span lang="en">${c.en}</span></b><br><span class="meta">${lock ? `Lv ${c.lv} 解锁` : `${fmtT(c.grow)} 成熟 · 收 ${c.yield} 个 · 有 ${S.seeds[id] || 0} 包`}</span></span>
+        <span class="row" style="gap:2px">${lock ? '' : `<button class="btn sm" type="button" data-b="${id}" data-n="1"${S.coins < c.seed ? ' disabled' : ''}>${uiImg('coin')}${c.seed}</button><button class="btn sm" type="button" data-b="${id}" data-n="5"${S.coins < c.seed * 5 ? ' disabled' : ''}>×5</button>`}</span></div>`;
+    }).join('');
+    const locked = Object.keys(PLOT_LOCK).filter(k => !S.plots[k].open);
+    node.querySelector('[data-l]').innerHTML = locked.length ? locked.map(k => `<div class="li${S.lv < PLOT_LOCK[k].lv ? ' off' : ''}">${im('lock', lockSpr(), 3)}<span><b>第 ${+k + 1} 块地</b><br><span class="meta">Lv ${PLOT_LOCK[k].lv} 可开垦</span></span><button class="btn sm green" type="button" data-p="${k}"${S.lv < PLOT_LOCK[k].lv || S.coins < PLOT_LOCK[k].c ? ' disabled' : ''}>${uiImg('coin')}${PLOT_LOCK[k].c}</button></div>`).join('') : '<p class="lead">九块地都开好了。</p>';
+  };
+  draw();
+  node.addEventListener('click', e => {
+    const b = e.target.closest('[data-b]');
+    if (b) { const id = b.dataset.b, n = +b.dataset.n, cost = CROPS[id].seed * n; if (S.coins < cost) return; S.coins -= cost; addTo(S.seeds, id, n); SFX.coin(); save(); refreshHUD(); draw(); toast(`买了 ${n} 包${CROPS[id].zh}种子`); return; }
+    const p = e.target.closest('[data-p]');
+    if (p) { const k = +p.dataset.p, L0 = PLOT_LOCK[k]; if (S.coins < L0.c || S.lv < L0.lv) return; S.coins -= L0.c; S.plots[k].open = true; gainXP(5); SFX.coin(); save(); refreshHUD(); draw(); toast('新地块开好了'); return; }
+    if (e.target.closest('[data-a=x]')) L.close();
+  });
+}
+function openBag() {
+  const node = h(`<div class="list"><h3>仓库</h3><div class="sec">食材</div><div class="list" data-i></div><div class="sec">种子</div><div class="chips" data-s></div><div class="sec">做好的菜</div><div class="chips" data-d></div><div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button></div></div>`);
+  const L = openLayer(node);
+  const draw = () => {
+    const ids = Object.keys(ITEMS).filter(id => S.inv[id] > 0);
+    node.querySelector('[data-i]').innerHTML = ids.length ? ids.map(id => `<div class="li">${itemImg(id, 3)}<span><b>${ITEMS[id].zh} <span lang="en">${ITEMS[id].en}</span></b><br><span class="meta">有 ${S.inv[id]} 个 · 单卖 ${ITEMS[id].sell} 金币</span></span><button class="btn sm ghost" type="button" data-sell="${id}">卖 1 个</button></div>`).join('') : '<p class="lead">仓库空空的，去地里收点菜吧。</p>';
+    const sd = CROP_IDS.filter(id => S.seeds[id] > 0);
+    node.querySelector('[data-s]').innerHTML = sd.length ? sd.map(id => `<span class="chip">${itemImg(id, 2)}${CROPS[id].zh} ×${S.seeds[id]}</span>`).join('') : '<span class="lead">没有种子</span>';
+    const dc = {}; S.dishes.forEach(d => { dc[d.id] = dc[d.id] || []; dc[d.id].push(d.q); });
+    node.querySelector('[data-d]').innerHTML = Object.keys(dc).length ? Object.entries(dc).map(([id, qs]) => `<span class="chip">${dishImg(id, 2)}${RECIPE[id].zh} ×${qs.length}</span>`).join('') : '<span class="lead">还没有做好的菜</span>';
+  };
+  draw();
+  node.addEventListener('click', e => {
+    const b = e.target.closest('[data-sell]');
+    if (b) { const id = b.dataset.sell; if (!S.inv[id]) return; addTo(S.inv, id, -1); gainCoins(ITEMS[id].sell); SFX.coin(); save(); refreshHUD(); draw(); return; }
+    if (e.target.closest('[data-a=x]')) L.close();
+  });
+}
+
+// ================= 厨房：分步做菜，每步说一句英文 =================
+let COOK = null;
+const ING_COL = { tomato: C.tomato, lettuce: C.leaf, carrot: C.carrot, potato: '#f0dca8', onion: '#e8c890', corn: C.corn, strawberry: '#f48aa0', pumpkin: C.pumpkin, egg: '#f6d54a' };
+const kitchenBg = ph => spr('kbg:' + ph, () => {
+  const [c, g] = mk(160, 84);
+  R(g, 0, 0, 160, 60, '#f4ead8');
+  for (let y = 0; y < 60; y += 8) { R(g, 0, y, 160, 1, '#e2d4bc'); for (let x = (y / 8 % 2) * 8; x < 160; x += 16) R(g, x, y, 1, 8, '#e2d4bc'); }
+  box(g, 114, 8, 34, 24, C.wood2); skyFill(g, 115, 9, 32, 22, SKY[ph][0], SKY[ph][1], 4); R(g, 130, 9, 2, 22, C.wood2); R(g, 115, 19, 32, 2, C.wood2);
+  R(g, 10, 22, 62, 3, C.wood); R(g, 10, 25, 62, 1, C.wood2);
+  [[14, C.gold], [24, C.tomato], [34, C.leafHi], [46, '#f4f0e8'], [57, '#c88a50']].forEach(([x, col]) => { box(g, x, 14, 6, 8, col); R(g, x, 12, 6, 2, C.wood2); P(g, x + 1, 15, '#ffffff'); });
+  R(g, 80, 6, 26, 1, C.steel2); R(g, 84, 7, 1, 10, C.steel2); E(g, 84, 18, 2.2, 1.6, C.steel2); R(g, 92, 7, 1, 9, C.wood2); box(g, 91, 16, 3, 4, C.steel); R(g, 100, 7, 1, 6, C.steel2); E(g, 100, 16, 2, 3.4, C.steel); P(g, 100, 15, C.steel2);
+  return c;
+});
+const kitchenFront = () => spr('kfront', () => {
+  const [c, g] = mk(160, 84);
+  R(g, 0, 58, 160, 4, C.wood3); R(g, 0, 62, 160, 1, C.wood2); R(g, 0, 63, 160, 21, '#c08860');
+  for (let x = 0; x < 160; x += 32) { R(g, x + 2, 66, 28, 15, '#b07848'); R(g, x + 2, 66, 28, 1, '#9a6438'); R(g, x + 14, 70, 4, 1, C.gold2); }
+  return c;
+});
+function kBowl(g, cx, by, w, col, fillCol) {
+  const hw = w / 2;
+  for (let r = 0; r < 9; r++) { const k = Math.round(hw * Math.sqrt(1 - (r / 9) ** 2)); R(g, cx - k - 1, by - 9 + r, 2 * k + 2, 1, C.ink); R(g, cx - k, by - 9 + r, 2 * k, 1, col); }
+  R(g, cx - hw - 1, by - 10, w + 2, 1, C.ink); R(g, cx - Math.round(hw * .5), by, Math.round(hw), 1, C.ink);
+  if (fillCol) E(g, cx, by - 9, hw - 2, 1.8, fillCol);
+}
+function kPan(g, cx, by, t, on) {
+  box(g, cx - 15, by, 30, 3, C.dark);
+  for (let i = 0; i < 6; i++) { const fh = 1 + ((t / 70 + i * 3) | 0) % 3 + (on ? 1 : 0); R(g, cx - 11 + i * 4, by - fh, 2, fh, i % 2 ? '#ffb030' : '#ff6a2a'); }
+  E(g, cx, by - 5, 19, 4.6, C.ink); E(g, cx, by - 5, 18, 3.8, '#4a4450'); E(g, cx, by - 6, 15, 2.4, '#2e2a34');
+  R(g, cx + 18, by - 7, 15, 4, C.ink); R(g, cx + 19, by - 6, 13, 2, C.wood2);
+}
+function kPot(g, cx, by, t, on, col) {
+  box(g, cx - 15, by, 30, 3, C.dark);
+  for (let i = 0; i < 6; i++) { const fh = 1 + ((t / 70 + i * 3) | 0) % 3; R(g, cx - 11 + i * 4, by - fh, 2, fh, i % 2 ? '#ffb030' : '#ff6a2a'); }
+  box(g, cx - 13, by - 21, 26, 19, C.steel); R(g, cx - 13, by - 21, 26, 2, '#e4e8f0'); box(g, cx - 15, by - 23, 30, 2, C.steel2); box(g, cx - 18, by - 17, 3, 3, C.steel2); box(g, cx + 15, by - 17, 3, 3, C.steel2);
+  E(g, cx, by - 23, 12, 1.4, col);
+  const n = on ? 4 : 2; for (let i = 0; i < n; i++) { const ph = ((t / (on ? 500 : 900)) + i / n) % 1; P(g, cx - 9 + ((i * 7) % 18), by - 25 - ph * 12, ph < .5 ? '#ffffff' : '#e8eef8'); }
+}
+function kKnife(g, x, y) { box(g, x, y, 3, 11, C.steel); R(g, x, y, 1, 11, '#f4f8ff'); box(g, x, y - 5, 3, 4, C.wood2); }
+function drawCook(t) {
+  const g = COOK.g, a = COOK.act, cx = 98, by = 58, an = COOK.anim, on = !!an && t - an.t0 < an.dur, p = on ? (t - an.t0) / an.dur : 0, ic = a.ing ? itemSpr(a.ing) : null, col = ING_COL[a.ing] || '#9ad4f4';
+  g.drawImage(kitchenBg(todPhase()), 0, 0);
+  const df = on ? (t / 110 | 0) % 2 : (t / 600 | 0) % 2; g.drawImage(ddSpr('chef', df), 24, 36 + (on ? -((t / 110 | 0) % 2) : 0));
+  g.drawImage(kitchenFront(), 0, 0);
+  switch (a.act) {
+    case 'cut': case 'peel': case 'tear': case 'scoop': {
+      box(g, cx - 22, by - 3, 44, 3, C.wood3); R(g, cx - 22, by - 1, 44, 1, C.wood);
+      if (a.act === 'tear') { const s = on ? Math.round(p * 6) : 0; if (ic) { g.drawImage(ic, cx - 14 - s, by - 15); g.drawImage(ic, cx - 2 + s, by - 15); } break; }
+      if (ic) g.drawImage(ic, cx - 15, by - 15);
+      if (a.act === 'cut') { const ky = on ? Math.round(Math.abs(Math.sin(t / 55)) * 7) : 3 + Math.round(Math.sin(t / 400)); kKnife(g, cx + 1, by - 15 - ky); if (on) for (let i = 0; i < Math.floor(p * 5); i++) box(g, cx + 8 + i * 3, by - 6, 2, 3, col); if (on && Math.random() < .3) SFX.chop(); }
+      if (a.act === 'peel') { const kx = on ? cx - 13 + Math.round((t / 40) % 12) : cx + 4; kKnife(g, kx, by - 19); if (on && Math.random() < .5) COOK.pt.push({ x: kx, y: by - 10, vx: (Math.random() - .5) * 1.2, vy: -.8, g: .1, life: 16, col: a.ing === 'carrot' ? C.carrot2 : '#c8a070' }); }
+      if (a.act === 'scoop') { const sy = on ? Math.round(Math.sin(t / 90) * 4) : 0; box(g, cx + 2, by - 26 + sy, 2, 12, C.steel2); E(g, cx + 3, by - 13 + sy, 2.6, 1.8, C.steel); if (on && Math.random() < .4) COOK.pt.push({ x: cx + 3, y: by - 14, vx: Math.random() * 1.4, vy: -1, g: .1, life: 18, col: '#fff0c0' }); }
+      break;
+    }
+    case 'wash': kBowl(g, cx, by, 32, '#d4ecfa', C.water); if (ic) g.drawImage(ic, cx - 6, by - 17 + Math.round(Math.sin(t / 200) * (on ? 2 : 1))); box(g, cx - 4, by - 34, 8, 3, C.steel2); box(g, cx + 2, by - 31, 2, 3, C.steel2); if (on) { R(g, cx + 2, by - 27, 2, 14, C.water); if (Math.random() < .6) COOK.pt.push({ x: cx - 10 + Math.random() * 20, y: by - 11, vx: (Math.random() - .5), vy: -1.2, g: .12, life: 14, col: '#bfe8ff' }); } break;
+    case 'mix': { kBowl(g, cx, by, 32, '#f4f0e8', col); const an2 = on ? t / 70 : Math.sin(t / 500) * .5, wx = cx + Math.round(Math.cos(an2) * 6), wy = by - 11; L(g, wx, wy, wx + 8, wy - 16, C.steel2, 2); E(g, wx, wy, 2.4, 3.2, C.steel); P(g, wx, wy, C.steel2); break; }
+    case 'crack': {
+      kBowl(g, cx, by, 32, '#f4f0e8', on && p > .5 ? '#f6d54a' : '#f8f4ec');
+      if (!on || p < .35) { const w = on ? 0 : Math.round(Math.sin(t / 120)); E(g, cx + w, by - 24, 3.4, 4.4, C.ink); E(g, cx + w, by - 24, 2.6, 3.6, C.egg); P(g, cx - 1 + w, by - 26, '#ffffff'); }
+      else { const s = Math.round((p - .35) * 16); E(g, cx - 3 - s, by - 25, 3, 2.4, C.ink); E(g, cx - 3 - s, by - 25, 2.2, 1.6, C.egg); E(g, cx + 3 + s, by - 25, 3, 2.4, C.ink); E(g, cx + 3 + s, by - 25, 2.2, 1.6, C.egg); if (p < .8) E(g, cx, by - 22 + (p - .35) * 26, 1.8, 1.8, '#f6b820'); }
+      break;
+    }
+    case 'mash': { kBowl(g, cx, by, 32, '#e8b88a', '#f0dca8'); const my = on ? Math.round(Math.abs(Math.sin(t / 90)) * 6) : 2; box(g, cx - 1, by - 28 - my, 2, 13, C.steel2); box(g, cx - 6, by - 15 - my, 12, 2, C.steel); break; }
+    case 'heat': kPan(g, cx, by, t, on); E(g, cx, by - 6, 9, 1.4, '#f2d070'); if (on && Math.random() < .5) COOK.pt.push({ x: cx - 8 + Math.random() * 16, y: by - 8, vx: 0, vy: -.5, g: -.01, life: 16, col: '#fff6c8' }); break;
+    case 'fry': { kPan(g, cx, by, t, on); for (let i = 0; i < 5; i++) { const jy = on ? -Math.round(Math.abs(Math.sin(t / 120 + i)) * 9) : 0; box(g, cx - 9 + i * 4, by - 8 + jy, 2, 2, i % 2 ? col : '#f6d54a'); } if (on && Math.random() < .25) SFX.sizzle(); break; }
+    case 'boil': kPot(g, cx, by, t, on, a.ing ? col : '#9ad4f4'); break;
+    case 'season': { kPan(g, cx, by, t, on); for (let i = 0; i < 4; i++) box(g, cx - 7 + i * 4, by - 8, 2, 2, '#f6d54a'); const sy = on ? Math.round(Math.sin(t / 60) * 2) : 0; box(g, cx - 3, by - 32 + sy, 6, 9, '#ffffff'); box(g, cx - 3, by - 35 + sy, 6, 2, C.steel2); P(g, cx - 1, by - 28 + sy, C.ink); if (on && Math.random() < .7) COOK.pt.push({ x: cx - 2 + Math.random() * 4, y: by - 22, vx: (Math.random() - .5) * .4, vy: .8, g: .02, life: 14, col: '#ffffff' }); break; }
+    case 'blend': { const sh = on ? Math.round(Math.sin(t / 25)) : 0, lv = 6 + Math.round(on ? p * 8 : 0); box(g, cx - 9 + sh, by - 8, 18, 8, '#d0603a'); P(g, cx + 5 + sh, by - 5, '#ffe060'); box(g, cx - 8 + sh, by - 31, 16, 22, '#e4f4ff'); R(g, cx - 8 + sh, by - 9 - lv, 16, lv, col); R(g, cx - 7 + sh, by - 30, 2, 18, '#ffffff'); box(g, cx - 9 + sh, by - 34, 18, 2, C.dark); if (on && Math.random() < .5) COOK.pt.push({ x: cx - 5 + Math.random() * 10, y: by - 10 - lv, vx: 0, vy: -.3, g: 0, life: 8, col: '#ffffff' }); break; }
+    case 'pour': { const lv = on ? Math.round(p * 13) : 2; box(g, cx + 6, by - 18, 12, 18, '#e4f4ff'); R(g, cx + 6, by - lv, 12, lv, a.ing ? col : '#c88a50'); const tilt = on ? 1 : 0; box(g, cx - 18, by - 32 + tilt * 2, 12, 13, C.steel); box(g, cx - 6, by - 31 + tilt * 2, 3, 2, C.steel); box(g, cx - 21, by - 29, 2, 7, C.steel2); if (on) R(g, cx - 2, by - 29, 2, 28 - lv, a.ing ? col : '#c88a50'); break; }
+    case 'bake': { box(g, cx - 22, by - 30, 44, 30, C.steel); const glow = on ? ((t / 120 | 0) % 2 ? '#ffb040' : '#ff8a30') : '#3a3440'; box(g, cx - 16, by - 23, 32, 15, glow); R(g, cx - 16, by - 27, 32, 1, C.steel2); [cx - 12, cx - 6, cx + 6, cx + 12].forEach(x => box(g, x, by - 29, 2, 2, C.dark)); if (on) { box(g, cx - 10, by - 14, 20, 3, '#c8884a'); R(g, cx - 9, by - 14, 18, 1, C.pumpkin); } break; }
+    case 'serve': { E(g, cx, by - 3, 18, 4.6, C.ink); E(g, cx, by - 3, 17, 3.8, '#ffffff'); E(g, cx, by - 3, 12, 2.4, '#eef0f8'); if (COOK.done || on) g.drawImage(dishSpr(COOK.r.id), cx - 9, by - 18); else { box(g, cx - 8, by - 9, 16, 4, '#d8a060'); R(g, cx - 6, by - 10, 12, 1, '#f6d54a'); } break; }
+  }
+  for (let i = COOK.pt.length - 1; i >= 0; i--) { const q = COOK.pt[i]; q.x += q.vx; q.y += q.vy; q.vy += q.g; if (--q.life <= 0) { COOK.pt.splice(i, 1); continue; } P(g, q.x, q.y, q.col); }
+}
+function startCook(rid) {
+  const r = RECIPE[rid]; if (!r || !canCook(r)) { toast('食材不够，先去农场收菜'); return; }
+  const node = h(`<div class="cook">
+    <div class="ck-top"><button class="btn ghost sm" type="button" data-a="x">退出</button><div class="ck-title"><b lang="en">${esc(r.en)}</b><span>${r.zh} · 共 ${r.steps.length} 步</span></div><div class="pips">${r.steps.map(() => '<i></i>').join('')}</div></div>
+    <div class="scene-wrap px"><canvas class="scene" width="160" height="84" aria-label="豆豆在厨房做菜"></canvas></div>
+    <div class="ck-body"></div>
+  </div>`);
+  const L = openLayer(node, { full: true, onClose: () => { COOK = null; if ('speechSynthesis' in window) speechSynthesis.cancel(); stopListen(); } });
+  const cv = node.querySelector('canvas'), g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
+  COOK = { r, i: 0, stars: [], L, node, g, act: { act: r.steps[0].act, ing: r.steps[0].ing }, anim: null, pt: [], done: false };
+  node.querySelector('[data-a=x]').onclick = () => L.close();
+  showStep();
+}
+function showStep() {
+  const ck = COOK, st = ck.r.steps[ck.i], n = ck.r.steps.length, body = ck.node.querySelector('.ck-body');
+  ck.act = { act: st.act, ing: st.ing }; ck.anim = null;
+  ck.node.querySelectorAll('.pips i').forEach((el, i) => { el.className = i < ck.i ? 'done' : i === ck.i ? 'now' : ''; });
+  body.innerHTML = `<div class="list"><p class="eyebrow">第 ${ck.i + 1} 步 · STEP ${ck.i + 1}</p><div class="slot"></div><div class="row end"><button class="btn ghost" type="button" data-a="skip">跳过这步</button><button class="btn green" type="button" data-a="next" disabled>${ck.i === n - 1 ? '完成出锅' : '下一步'}</button></div></div>`;
+  const next = body.querySelector('[data-a=next]'), skip = body.querySelector('[data-a=skip]');
+  const card = speakCard({ k: st.en, en: st.en, zh: st.zh, v: st.v }, { onResult: () => { next.disabled = false; } });
+  body.querySelector('.slot').append(card.el);
+  const go = stars => {
+    if (COOK !== ck) return;
+    next.disabled = skip.disabled = true; stopListen(); ck.stars.push(stars); ck.anim = { t0: performance.now(), dur: 1300 };
+    if (st.act === 'cut') SFX.chop(); else if (st.act === 'wash' || st.act === 'pour') SFX.water(); else SFX.pop();
+    setTimeout(() => { if (COOK !== ck) return; ck.i++; if (ck.i >= n) finishCook(); else { showStep(); say(ck.r.steps[ck.i].en); } }, 1300);
+  };
+  next.onclick = () => go(card.best ? card.best.stars : 0);
+  skip.onclick = () => go(0);
+  if (ck.i === 0) say(st.en);
+}
+function finishCook() {
+  const ck = COOK, r = ck.r, avg = ck.stars.reduce((a, b) => a + b, 0) / ck.stars.length, q = Math.max(1, Math.min(3, Math.round(avg)));
+  for (const [k, n] of Object.entries(r.need)) addTo(S.inv, k, -n);
+  S.dishes.push({ id: r.id, q }); S.stats.cook++; quest('cook'); gainXP(10 + q * 5); save();
+  ck.act = { act: 'serve', ing: null }; ck.done = true;
+  ck.node.querySelectorAll('.pips i').forEach(el => { el.className = 'done'; });
+  SFX.lvl();
+  const body = ck.node.querySelector('.ck-body');
+  body.innerHTML = `<div class="big">${dishImg(r.id, 5)}<h3>${r.zh} 做好了！</h3>${starsHTML(q, 4)}<p class="muted">平均每步 ${avg.toFixed(1)} 星 · 售价 ${coinHTML(Math.round(r.price * [0, .8, 1, 1.25][q]))} · +${10 + q * 5} XP</p></div>
+    <div class="row end">${canCook(r) ? '<button class="btn ghost" type="button" data-a="again">再做一份</button>' : ''}<button class="btn ghost" type="button" data-a="k">回厨房</button><button class="btn green" type="button" data-a="d">去小馆上菜</button></div>`;
+  body.querySelector('[data-a=k]').onclick = () => ck.L.close();
+  body.querySelector('[data-a=d]').onclick = () => { ck.L.close(); go('diner'); };
+  const ag = body.querySelector('[data-a=again]'); if (ag) ag.onclick = () => { ck.L.close(); startCook(r.id); };
+}
+
+// ================= 小馆：英文点单、报价、收钱 =================
+const dinerBg = ph => spr('dbg:' + ph, () => {
+  const [c, g] = mk(160, 96);
+  R(g, 0, 0, 160, 72, '#f6dcc0'); for (let x = 0; x < 160; x += 8) R(g, x, 0, 3, 46, '#f0ceac');
+  R(g, 0, 46, 160, 26, '#b87a52'); R(g, 0, 46, 160, 2, '#8e5a3a'); for (let x = 4; x < 160; x += 10) R(g, x, 50, 1, 22, '#a46a44');
+  box(g, 8, 8, 32, 26, C.wood2); skyFill(g, 9, 9, 30, 24, SKY[ph][0], SKY[ph][1], 4); R(g, 23, 9, 2, 24, C.wood2); R(g, 9, 20, 30, 2, C.wood2);
+  box(g, 54, 5, 52, 31, C.wood2); R(g, 56, 7, 48, 27, '#2f4a3a'); for (let x = 60; x < 100; x += 2) P(g, x, 11, '#d8e8d0');
+  box(g, 124, 10, 28, 60, C.wood); box(g, 128, 14, 20, 16, SKY[ph][1]); R(g, 137, 14, 2, 16, C.wood); P(g, 146, 44, C.gold); P(g, 146, 45, C.gold); E(g, 138, 6, 3, 3, C.gold); P(g, 138, 9, C.gold2);
+  box(g, 44, 38, 8, 8, '#c86a4a'); E(g, 48, 34, 5, 4, C.leaf); P(g, 46, 33, C.leafHi); P(g, 50, 32, '#f48ab8');
+  return c;
+});
+const dinerFront = () => spr('dfront', () => {
+  const [c, g] = mk(160, 96);
+  R(g, 0, 70, 160, 4, C.wood3); R(g, 0, 74, 160, 1, C.wood2); R(g, 0, 75, 160, 21, '#c08860');
+  for (let x = 0; x < 160; x += 32) { R(g, x + 3, 78, 26, 15, '#b07848'); R(g, x + 3, 78, 26, 1, '#9a6438'); }
+  return c;
+});
+let dinerCv, DGc;
+function drawDiner(t) {
+  const g = DGc, ph = todPhase();
+  g.drawImage(dinerBg(ph), 0, 0);
+  RECIPES.filter(r => r.lv <= S.lv).slice(-2).forEach((r, i) => g.drawImage(dishSpr(r.id), 60 + i * 22, 14));
+  S.cust.slice(0, 3).forEach((c, i) => {
+    const x = 34 + i * 46, bob = Math.round(Math.sin(t / 500 + c.id) * 1), blink = (t / 120 + c.id * 37) % 40 < 1.2 ? 1 : 0;
+    g.drawImage(critSpr(c.who, blink), x - 11, 50 + bob);
+    const have = dishCount(c.dish) > 0, bx = x - 1, byy = 30 + bob;
+    box(g, bx - 1, byy, 20, 17, '#ffffff'); P(g, bx + 3, byy + 17, C.ink); P(g, bx + 4, byy + 17, '#ffffff'); P(g, bx + 4, byy + 18, C.ink);
+    g.drawImage(dishSpr(c.dish), bx, byy);
+    if (have && (t / 400 | 0) % 2) { R(g, bx + 15, byy - 2, 4, 4, C.ink); R(g, bx + 16, byy - 1, 2, 2, C.leafHi); }
+  });
+  g.drawImage(dinerFront(), 0, 0);
+  const df = (t / 600 | 0) % 2; g.drawImage(ddSpr('chef', df), 136, 70);
+}
+function serve(cid) {
+  const c = S.cust.find(x => x.id === cid); if (!c) return;
+  const r = RECIPE[c.dish], have = S.dishes.filter(d => d.id === c.dish).sort((a, b) => b.q - a.q)[0];
+  if (!have) { toast('还没有这道菜，先去厨房做'); return; }
+  const k = CRITTERS[c.who], price = Math.round(r.price * [0, .8, 1, 1.25][have.q]), pick = a => a[Math.floor(Math.random() * a.length)];
+  const hr = new Date().getHours(), tod = hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening', todzh = hr < 12 ? '早上' : hr < 18 ? '下午' : '晚上';
+  const o = pick(T_ORDER), rp = pick(T_REPLY), as = pick(T_ASK), pr = pick(T_PRICE), th = pick(T_THANKS);
+  const script = [
+    { who: 'c', en: fill(o.en, { p: r.p, tod }), zh: fill(o.zh, { p: r.zh, todzh }) },
+    { who: 'me', en: rp.en, zh: rp.zh, k: rp.en },
+    { who: 'c', en: as.en, zh: as.zh },
+    { who: 'me', en: fill(pr.en, { n: price }), zh: fill(pr.zh, { n: price }), k: pr.en },
+    { who: 'c', en: th.en, zh: th.zh },
+  ];
+  const node = h(`<div class="list"><div class="row" style="flex-wrap:nowrap">${critImg(c.who, 3)}<div><h3>${k.name} <span class="muted" style="font-size:14px">${k.zh}</span></h3><p class="lead">想要 ${r.zh} · 你的库存最好是 ${have.q} 星</p></div></div><div class="chat"></div><div class="act"></div></div>`);
+  const L = openLayer(node, { full: true, onClose: () => { if ('speechSynthesis' in window) speechSynthesis.cancel(); stopListen(); } });
+  const chat = node.querySelector('.chat'), act = node.querySelector('.act'), scores = [];
+  let idx = 0;
+  const bubble = (who, s, stars) => {
+    const b = h(`<div class="bub ${who}">${who === 'c' ? critImg(c.who, 2) : ''}<div class="txt"><p class="e" lang="en"></p>${S.cfg.zh ? '<p class="z"></p>' : ''}${who === 'c' ? `<button class="btn blue sm" type="button">${uiImg('spk')}再听</button>` : `<span class="tag">${starsHTML(stars, 2)}</span>`}</div>${who === 'me' ? im('dd:chef:0', ddSpr('chef', 0), 2) : ''}</div>`);
+    b.querySelector('.e').textContent = s.en; const z = b.querySelector('.z'); if (z) z.textContent = s.zh;
+    const btn = b.querySelector('button'); if (btn) btn.onclick = () => say(s.en, { pitch: k.pitch });
+    chat.append(b); b.scrollIntoView({ block: 'nearest' });
+  };
+  const step = () => {
+    const s = script[idx];
+    if (!s) return done();
+    if (s.who === 'c') { bubble('c', s); say(s.en, { pitch: k.pitch }); idx++; if (idx >= script.length) return done(); }
+    const m = script[idx];
+    act.innerHTML = `<div class="list"><p class="eyebrow">轮到你说</p><div class="slot"></div><div class="row end"><button class="btn green" type="button" data-a="n" disabled>说完了</button></div></div>`;
+    const nb = act.querySelector('[data-a=n]');
+    const card = speakCard({ k: m.k, en: m.en, zh: m.zh }, { onResult: () => { nb.disabled = false; } });
+    act.querySelector('.slot').append(card.el);
+    nb.onclick = () => { stopListen(); const b = card.best || { score: 0, stars: 0 }; scores.push(b.score); bubble('me', m, b.stars); idx++; step(); };
+    act.scrollIntoView({ block: 'nearest' });
+  };
+  const done = () => {
+    const avg = scores.reduce((a, b) => a + b, 0) / Math.max(1, scores.length), tip = avg >= 85 ? Math.ceil(price * .2) : 0;
+    S.dishes.splice(S.dishes.indexOf(have), 1); S.cust = S.cust.filter(x => x.id !== cid);
+    gainCoins(price + tip); gainXP(8); S.stats.serve++; quest('serve'); save(); SFX.coin();
+    act.innerHTML = `<div class="big">${uiImg('coin', 5)}<h3>+${price + tip} 金币</h3><p>${tip ? `菜钱 ${price} + 口语小费 ${tip}` : `菜钱 ${price}。两句都拿到三星还会有小费。`}</p></div><div class="row end"><button class="btn green" type="button" data-a="x">好的</button></div>`;
+    act.querySelector('[data-a=x]').onclick = () => L.close();
+  };
+  step();
+}
+
+// ================= 词本与练习 =================
+function entries() {
+  const out = [], seen = new Set(), push = e => { if (!seen.has(e.k)) { seen.add(e.k); out.push(e); } };
+  [...CROP_IDS, 'egg'].forEach(id => { const it = ITEMS[id]; push({ k: it.en, en: it.en, zh: it.zh, ipa: it.ipa, cat: 'food', lv: it.lv || 1, icon: id }); });
+  const vlv = {}; RECIPES.forEach(r => r.steps.forEach(s => { const v = s.v.toLowerCase(); if (vlv[v] === undefined || r.lv < vlv[v]) vlv[v] = r.lv; }));
+  Object.entries(VERB_INFO).forEach(([w, [ipa, zh]]) => push({ k: w, en: w, zh, ipa, cat: 'verb', lv: vlv[w] || 1 }));
+  CROP_IDS.forEach(id => { const c = CROPS[id]; push({ k: c.say.en, en: c.say.en, zh: c.say.zh, cat: 'sent', lv: c.lv, v: c.en }); });
+  RECIPES.forEach(r => r.steps.forEach(s => push({ k: s.en, en: s.en, zh: s.zh, cat: 'sent', lv: r.lv, v: s.v })));
+  T_REPLY.forEach(t => push({ k: t.en, en: t.en, zh: t.zh, cat: 'talk', lv: 1 }));
+  T_PRICE.forEach(t => push({ k: t.en, en: fill(t.en, { n: 20 }), zh: fill(t.zh, { n: 20 }), cat: 'talk', lv: 1 }));
+  return out;
+}
+let WF = 'all';
+function practice(list, title) {
+  const node = h(`<div class="list"><div class="row" style="justify-content:space-between"><h3>${title}</h3><span class="muted" data-c></span></div><div class="slot"></div><div class="row end"><button class="btn ghost" type="button" data-a="x">结束</button><button class="btn green" type="button" data-a="n" disabled>下一个</button></div></div>`);
+  const L = openLayer(node, { full: list.length > 1, onClose: () => { if ('speechSynthesis' in window) speechSynthesis.cancel(); stopListen(); } });
+  let i = 0, got = 0, card = null;
+  const nb = node.querySelector('[data-a=n]');
+  const show = () => {
+    const e = list[i]; node.querySelector('[data-c]').textContent = list.length > 1 ? `${i + 1} / ${list.length}` : '';
+    nb.disabled = true; nb.textContent = i === list.length - 1 ? '完成' : '下一个';
+    card = speakCard(e, { onResult: () => { nb.disabled = false; } });
+    const slot = node.querySelector('.slot'); slot.innerHTML = ''; slot.append(card.el); say(e.en);
+  };
+  nb.onclick = () => {
+    stopListen(); got += card.best ? card.best.stars : 0; i++;
+    if (i < list.length) return show();
+    if (list.length > 1) { const coins = got; gainCoins(coins); save(); SFX.coin(); node.querySelector('.slot').innerHTML = `<div class="big">${starsHTML(Math.round(got / list.length), 4)}<h3>练习完成</h3><p>一共拿到 ${got} 颗星，奖励 ${coins} 金币。</p></div>`; nb.hidden = true; node.querySelector('[data-a=x]').textContent = '好的'; }
+    else L.close();
+  };
+  node.querySelector('[data-a=x]').onclick = () => L.close();
+  show();
+}
+function drill() {
+  const pool = entries().filter(e => e.lv <= S.lv), pickd = [];
+  const weight = e => 110 - ((S.words[e.k] || {}).b || 0);
+  while (pickd.length < 5 && pickd.length < pool.length) {
+    const rest = pool.filter(e => !pickd.includes(e)), tot = rest.reduce((a, e) => a + weight(e), 0); let x = Math.random() * tot;
+    for (const e of rest) { x -= weight(e); if (x <= 0) { pickd.push(e); break; } }
+  }
+  practice(pickd, '快速练习 ×5');
+}
+
+// ================= 设置 / 升级 =================
+function openSettings() {
+  const st = SR ? (srBroken ? '这个环境拿不到麦克风，正在用跟读自评。' : '浏览器支持语音识别，第一次点「说」时会请求麦克风权限。') : '这个浏览器没有语音识别（建议用手机 Chrome 或 Safari 打开），会用跟读自评。';
+  const node = h(`<div class="list"><h3>设置</h3>
+    <div class="li"><span></span><span><b>显示中文提示</b><br><span class="meta">关掉后只看英文，更有挑战</span></span><button class="btn sm" type="button" data-t="zh"></button></div>
+    <div class="li"><span></span><span><b>收获时口语挑战</b><br><span class="meta">每次收获弹出一句跟读，说好多拿作物</span></span><button class="btn sm" type="button" data-t="talk"></button></div>
+    <div class="li"><span></span><span><b>音效</b></span><button class="btn sm" type="button" data-t="sfx"></button></div>
+    <div class="li"><span></span><span><b>评分方式</b><br><span class="meta">${st}</span></span><button class="btn sm" type="button" data-m></button></div>
+    <div class="li"><span></span><span><b>朗读语速</b></span><button class="btn sm" type="button" data-r></button></div>
+    <div class="sec">存档</div>
+    <p class="lead">存档保存在这台设备的浏览器里${CLOUD ? '，并同步到你的 Claude 账号' : ''}。已经说过 ${S.stats.spoken} 句英语，做过 ${S.stats.cook} 道菜，接待过 ${S.stats.serve} 位客人。</p>
+    <div class="row"><button class="btn red sm" type="button" data-a="reset">重新开始</button><span data-confirm hidden class="row"><span class="lead">进度会全部清空，确定吗？</span><button class="btn red sm" type="button" data-a="yes">确定清空</button></span></div>
+    <div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button></div></div>`);
+  const L = openLayer(node);
+  const draw = () => {
+    node.querySelectorAll('[data-t]').forEach(b => { const on = S.cfg[b.dataset.t]; b.textContent = on ? '开' : '关'; b.className = 'btn sm ' + (on ? 'green' : 'ghost'); });
+    node.querySelector('[data-m]').textContent = S.cfg.mode === 'self' ? '跟读自评' : '自动识别';
+    node.querySelector('[data-r]').textContent = { .8: '慢', .9: '中', 1: '正常' }[S.cfg.rate] || '中';
+  };
+  draw();
+  node.addEventListener('click', e => {
+    const t = e.target.closest('[data-t]'); if (t) { S.cfg[t.dataset.t] = !S.cfg[t.dataset.t]; save(); draw(); return; }
+    if (e.target.closest('[data-m]')) { S.cfg.mode = S.cfg.mode === 'self' ? 'auto' : 'self'; save(); draw(); return; }
+    if (e.target.closest('[data-r]')) { S.cfg.rate = S.cfg.rate === .8 ? .9 : S.cfg.rate === .9 ? 1 : .8; save(); draw(); say('Fresh tomatoes from my farm.'); return; }
+    if (e.target.closest('[data-a=reset]')) { node.querySelector('[data-confirm]').hidden = false; return; }
+    if (e.target.closest('[data-a=yes]')) { S = newGame(); S.intro = false; save(); L.close(); toast('已经重新开始'); return; }
+    if (e.target.closest('[data-a=x]')) L.close();
+  });
+}
+const LVQ = [];
+function levelUp(lv) { LVQ.push(lv); if (document.querySelector('.layer')) toast(`升到 Lv ${lv} 啦！`); setTimeout(flushLv, 350); }
+function flushLv() { if (LVQ.length && !document.querySelector('.layer')) showLv(LVQ.shift()); }
+function showLv(lv) {
+  const crops = CROP_IDS.filter(id => CROPS[id].lv === lv), recs = RECIPES.filter(r => r.lv === lv), plots = Object.keys(PLOT_LOCK).filter(k => PLOT_LOCK[k].lv === lv);
+  {
+    SFX.lvl();
+    const node = h(`<div class="big"><p class="eyebrow">LEVEL UP</p><h3>升到 Lv ${lv} 啦！</h3>
+      ${crops.length || recs.length || plots.length ? `<p>新解锁：</p><div class="chips" style="justify-content:center">${crops.map(id => `<span class="chip">${itemImg(id, 2)}${CROPS[id].zh}种子</span>`).join('')}${recs.map(r => `<span class="chip">${dishImg(r.id, 2)}${r.zh}</span>`).join('')}${plots.map(() => `<span class="chip">${im('lock', lockSpr(), 2)}可开垦新地</span>`).join('')}</div>` : '<p>继续加油！</p>'}
+      <button class="btn green" type="button">太好了</button></div>`);
+    const L = openLayer(node, { center: true }); node.querySelector('button').onclick = () => L.close();
+  }
+}
+
+// ================= 页面渲染 =================
+let VIEW = 'farm';
+const TABS = [['farm', '农场'], ['kitchen', '厨房'], ['diner', '小馆'], ['words', '词本']];
+function go(v) {
+  VIEW = v; TABS.forEach(([k]) => { $('#v-' + k).hidden = k !== v; $(`#tabs [data-v=${k}]`).setAttribute('aria-selected', k === v); });
+  $('#stage').scrollTop = 0; refresh();
+}
+function refreshHUD() {
+  $('#lvText').textContent = 'Lv ' + S.lv;
+  const a = lvNeed(S.lv - 1), b = lvNeed(S.lv); $('#xpText').textContent = `${S.xp - a} / ${b - a} XP`; $('#xpFill').style.width = Math.min(100, (S.xp - a) / (b - a) * 100) + '%';
+  $('#coins').innerHTML = uiImg('coin', 3) + S.coins;
+}
+function refreshBadges() {
+  const ck = RECIPES.filter(r => r.lv <= S.lv && canCook(r)).length, sv = S.cust.filter(c => dishCount(c.dish) > 0).length;
+  [['kitchen', ck], ['diner', sv || 0]].forEach(([k, n]) => { const b = $(`#tabs [data-v=${k}] .badge`); b.hidden = !n; b.textContent = n; });
+  const ripe = S.plots.filter(p => p.open && p.crop && p.prog >= growMs(p.crop)).length; const fb = $('#tabs [data-v=farm] .badge'); fb.hidden = !ripe; fb.textContent = ripe;
+}
+function farmTip() {
+  const P0 = S.plots.filter(p => p.open);
+  const ripe = P0.filter(p => p.crop && p.prog >= growMs(p.crop)).length, care = P0.filter(p => p.crop && (p.bugs || p.weeds || (p.dry && p.prog < growMs(p.crop)))).length, empty = P0.filter(p => !p.crop && !p.dead).length, dead = P0.filter(p => p.dead).length;
+  const grow = P0.filter(p => p.crop && p.prog < growMs(p.crop)).map(p => ({ id: p.crop, s: (growMs(p.crop) - p.prog) / plotRate(p) / 1000 })).sort((a, b) => a.s - b.s)[0];
+  const bits = [];
+  if (ripe) bits.push(`${ripe} 块地可以收获`);
+  if (care) bits.push(`${care} 块需要照料（虫子、杂草、缺水会拖慢生长）`);
+  if (dead) bits.push(`${dead} 块枯苗要清理`);
+  if (empty) bits.push(`${empty} 块空地可以播种`);
+  if (!bits.length && grow) bits.push(`下一批：${CROPS[grow.id].zh} ${fmtT(grow.s)} 后成熟`);
+  if (S.nest.eggs) bits.push(`鸡窝里有 ${S.nest.eggs} 个蛋`);
+  $('#farmTip').textContent = bits.length ? '点地块：' + bits.join('；') + '。' : '地都种满了，去厨房看看吧。';
+}
+function renderQuests() {
+  ensureQuests();
+  $('#quests').innerHTML = `<h2>今日任务 <small>每天零点刷新</small></h2><ul class="qlist">${S.q.list.map((q, i) => `<li><span>${QDEF[q.id].zh}</span><span class="qbar">${q.n}/${q.goal}</span>${q.done ? '<span class="qbar">已领</span>' : `<button class="btn sm${q.n >= q.goal ? ' green' : ''}" type="button" data-q="${i}"${q.n >= q.goal ? '' : ' disabled'}>${uiImg('coin')}${10 + q.goal * 4}</button>`}</li>`).join('')}</ul>`;
+}
+function renderIntro() {
+  const el = $('#intro'); el.hidden = !S.intro; if (!S.intro) return;
+  el.innerHTML = `<h2>玩法 <button class="btn ghost sm" type="button" data-a="intro-x">知道了</button></h2><ol>
+    <li>在农场点地块：播种、捉虫、除草、浇水、收获。收获时跟读一句英文，说得好多拿作物。</li>
+    <li>去厨房用食材做菜。每一步都要说出英文做法，平均星级决定菜的品质和价格。</li>
+    <li>在小馆接待客人：听懂点单，用英语回答、报价，口语好还有小费。</li></ol>
+    <p class="muted">${SR ? '点「说」会请求麦克风权限；用不了麦克风时，会自动改成跟读后自评。' : '这个浏览器不支持语音识别，会用「听 → 跟读 → 自评」的方式练习。'}</p>`;
+}
+function renderKitchen() {
+  $('#recipes').innerHTML = RECIPES.map(r => {
+    const lock = r.lv > S.lv, ok = canCook(r), n = dishCount(r.id);
+    return `<article class="rc px${lock ? ' locked' : ''}">${dishImg(r.id, 3)}<div><h3 lang="en">${esc(r.en)}</h3><p class="sub">${r.zh} · ${r.steps.length} 句英文</p><div class="chips">${Object.entries(r.need).map(([k, m]) => `<span class="chip${(S.inv[k] || 0) < m ? ' lack' : ''}">${itemImg(k, 2)}${S.inv[k] || 0}/${m}</span>`).join('')}</div></div>
+      <div class="rc-side">${coinHTML(r.price)}${lock ? `<span>Lv ${r.lv} 解锁</span>` : `<span>库存 ${n}</span>`}<button class="btn sm ${ok ? 'green' : 'ghost'}" type="button" data-cook="${r.id}"${ok ? '' : ' disabled'}>${ok ? '做菜' : '缺食材'}</button></div></article>`;
+  }).join('');
+}
+let custSig = '';
+function renderDiner() {
+  custSig = S.cust.map(c => c.id + ':' + dishCount(c.dish)).join(',');
+  $('#custList').innerHTML = S.cust.length ? S.cust.map(c => {
+    const k = CRITTERS[c.who], r = RECIPE[c.dish], n = dishCount(c.dish);
+    return `<article class="cc px">${critImg(c.who, 2)}<div><b>${k.name}</b> <span class="muted">${k.zh}</span><p>想要 ${dishImg(c.dish, 1)} ${r.zh}</p><p class="muted">${n ? `库存 ${n} 份，可以上菜` : '还没有这道菜'}</p></div>${n ? `<button class="btn green" type="button" data-serve="${c.id}">接待</button>` : `<button class="btn ghost sm" type="button" data-gocook="${r.id}">去做菜</button>`}</article>`;
+  }).join('') : `<div class="px empty">店里暂时没有客人，过一会儿就会有人进门。先去厨房备几道菜吧。</div>`;
+  const dc = {}; S.dishes.forEach(d => { dc[d.id] = (dc[d.id] || 0) + 1; });
+  $('#stock').innerHTML = Object.keys(dc).length ? Object.entries(dc).map(([id, n]) => `<span class="chip">${dishImg(id, 2)}${RECIPE[id].zh} ×${n}</span>`).join('') : '<span class="muted zh">还没有做好的菜。</span>';
+  $('#earned').textContent = `累计收入 ${S.stats.earned}`;
+}
+function renderWords() {
+  const all = entries(), open = all.filter(e => e.lv <= S.lv), done = open.filter(e => S.words[e.k]), three = open.filter(e => (S.words[e.k] || {}).b >= 85);
+  $('#wSum').innerHTML = `<div><b>${done.length}</b><span>练过</span></div><div><b>${three.length}</b><span>三星</span></div><div><b>${open.length}</b><span>已解锁</span></div><button class="btn green" type="button" data-a="drill">${uiImg('mic')}快速练习 ×5（按星数给金币）</button>`;
+  const F = [['all', '全部'], ['food', '食材'], ['verb', '动作'], ['sent', '句子'], ['talk', '待客']];
+  $('#wFilter').innerHTML = F.map(([k, n]) => `<button class="btn sm" type="button" data-f="${k}" aria-pressed="${WF === k}">${n}</button>`).join('');
+  const list = open.filter(e => WF === 'all' || e.cat === WF);
+  $('#wList').innerHTML = list.map(e => { const w = S.words[e.k]; return `<div class="wrow" data-w="${esc(e.k)}" role="button" tabindex="0"><div><div class="en" lang="en">${e.icon ? itemImg(e.icon, 2) + ' ' : ''}${esc(e.en)}</div><div class="meta">${e.ipa ? `<span class="ipa">${esc(e.ipa)}</span> · ` : ''}${esc(e.zh)}${w ? ` · 练过 ${w.n} 次` : ''}</div></div><div class="row" style="gap:4px;flex-wrap:nowrap">${starsHTML(w ? starsOf(w.b) : 0, 2)}<button class="btn blue sm" type="button" data-say="${esc(e.en)}" aria-label="听发音">${uiImg('spk')}</button></div></div>`; }).join('')
+    + (all.length > open.length ? `<p class="locked-note muted">还有 ${all.length - open.length} 条会随等级解锁。</p>` : '');
+}
+function refresh() {
+  if (!S) return;
+  refreshHUD(); refreshBadges(); flushLv();
+  if (VIEW === 'farm') { farmTip(); renderQuests(); renderIntro(); }
+  else if (VIEW === 'kitchen') renderKitchen();
+  else if (VIEW === 'diner') renderDiner();
+  else if (VIEW === 'words') renderWords();
+}
+let tipT = 0;
+function tick() {
+  const now = Date.now(), dt = Math.min(now - S.last, 3 * 864e5); S.last = now; simulate(dt);
+  refreshHUD(); refreshBadges();
+  if (VIEW === 'farm' && now - tipT > 1000) { tipT = now; farmTip(); }
+  if (VIEW === 'diner' && S.cust.map(c => c.id + ':' + dishCount(c.dish)).join(',') !== custSig) renderDiner();
+  if (S.q && S.q.day !== todayKey()) refresh();
+  if (now % 10000 < 1000) save(false);
+}
+
+// ================= 启动 =================
+let lastFrame = 0;
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (t - lastFrame < 33) return; lastFrame = t;
+  if (VIEW === 'farm') drawFarm(t); else if (VIEW === 'diner') drawDiner(t);
+  if (COOK) drawCook(t);
+}
+function boot() {
+  S = loadLocal() || newGame();
+  simulate(Date.now() - S.last); S.last = Date.now(); ensureQuests();
+  farmCv = $('#farmCv'); FG = farmCv.getContext('2d'); FG.imageSmoothingEnabled = false;
+  dinerCv = $('#dinerCv'); DGc = dinerCv.getContext('2d'); DGc.imageSmoothingEnabled = false;
+  $('#ava').innerHTML = im('dd:farm:0', ddSpr('farm', 0), 2);
+  $('#bShop').innerHTML = im('seedbag', seedBagSpr(), 2) + '种子店';
+  $('#bBag').innerHTML = im('basket', basketSpr(), 2) + '仓库';
+  $('#tabs').innerHTML = TABS.map(([k, n]) => `<button type="button" role="tab" data-v="${k}" aria-selected="${k === 'farm'}">${im('tab:' + k, tabSpr(k), 2)}<span>${n}</span><i class="badge" hidden></i></button>`).join('');
+  $('#tabs').addEventListener('click', e => { const b = e.target.closest('[data-v]'); if (b) { ac(); SFX.click(); go(b.dataset.v); } });
+  farmCv.addEventListener('click', onFarmTap);
+  $('#bShop').onclick = () => { ac(); openShop(); };
+  $('#bBag').onclick = () => { ac(); openBag(); };
+  $('#bSet').onclick = () => { ac(); openSettings(); };
+  $('#stage').addEventListener('click', e => {
+    const t = e.target;
+    const q = t.closest('[data-q]'); if (q) { const it = S.q.list[+q.dataset.q]; if (it.n >= it.goal && !it.done) { it.done = true; gainCoins(10 + it.goal * 4); gainXP(8); SFX.coin(); save(); refresh(); } return; }
+    if (t.closest('[data-a=intro-x]')) { S.intro = false; save(); refresh(); return; }
+    const ck = t.closest('[data-cook]'); if (ck) { ac(); startCook(ck.dataset.cook); return; }
+    const gc = t.closest('[data-gocook]'); if (gc) { go('kitchen'); return; }
+    const sv = t.closest('[data-serve]'); if (sv) { ac(); serve(+sv.dataset.serve); return; }
+    if (t.closest('[data-a=drill]')) { ac(); drill(); return; }
+    const f = t.closest('[data-f]'); if (f) { WF = f.dataset.f; renderWords(); return; }
+    const sy = t.closest('[data-say]'); if (sy) { say(sy.dataset.say); return; }
+    const w = t.closest('[data-w]'); if (w) { const e2 = entries().find(x => x.k === w.dataset.w); if (e2) { ac(); practice([e2], '单句练习'); } }
+  });
+  $('#stage').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-w]')) { e.preventDefault(); e.target.click(); } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { save(false); pushCloud(true); } else tick(); });
+  go('farm');
+  setInterval(tick, 1000);
+  requestAnimationFrame(frame);
+  initCloud();
+}
+boot();
+</script>
