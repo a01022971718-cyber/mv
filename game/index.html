@@ -159,17 +159,19 @@ canvas.scene{display:block;width:100%;height:auto;image-rendering:pixelated;imag
 .sp-en .w.v{background:var(--mid);box-shadow:inset 0 -3px 0 0 #e0a830}
 .sp-en .w.ok{background:var(--ok);box-shadow:none}
 .sp-en .w.part{background:var(--mid);box-shadow:none}
+.sp-en .w.cur{background:#bfe0ff;box-shadow:inset 0 -3px 0 0 #4a90d0}
 .sp-en .w.miss{background:var(--miss);box-shadow:none;text-decoration:underline wavy #c0392b}
 .sp-zh{font-family:var(--f-zh);font-size:14px;color:var(--ink2)}
 .sp-row{display:flex;gap:8px;flex-wrap:wrap}
+.sp-row .btn{white-space:nowrap}
 .sp-row .mic{flex:1}
 .mic.on{animation:pulse .7s steps(2) infinite}
 @keyframes pulse{50%{background:#ffb0a0}}
 .sp-heard:empty,.sp-res:empty{display:none}
 .sp-heard{font-size:13px;color:var(--ink2);min-height:1.3em;font-family:var(--f-zh);-webkit-user-select:text;user-select:text}
 .sp-res{display:flex;align-items:center;gap:8px;min-height:26px;font-weight:700}
-.sp-self{display:grid;gap:6px;font-family:var(--f-zh);font-size:13px;color:var(--ink2)}
-.sp-self p{margin:0}
+.sp-dl,.sp-self{display:grid;gap:6px;font-family:var(--f-zh);font-size:13px;color:var(--ink2)}
+.sp-dl p,.sp-self p{margin:0}
 
 /* 做菜 */
 .cook{display:grid;gap:10px;align-content:start}
@@ -435,11 +437,11 @@ const eggSmall = () => spr('eggS', () => sprite(4, 5, g => { E(g, 2, 2.5, 2, 2.5
 
 // 客人：五只原创小动物（半身像 20×22）
 const CRITTERS = {
-  mimi:  { name: 'Mimi',  zh: '小猫',   fur: '#f0a050', fur2: '#c87830', muz: '#fff4e0', shirt: '#5a8ad0', ear: 'cat',     pitch: 1.35 },
-  pip:   { name: 'Pip',   zh: '小兔',   fur: '#f6f2f0', fur2: '#d8d0d0', muz: '#ffffff', shirt: '#e07aa0', ear: 'bunny',   pitch: 1.6 },
-  bruno: { name: 'Bruno', zh: '大熊',   fur: '#9a6a44', fur2: '#74492c', muz: '#d8b088', shirt: '#4e9a5c', ear: 'bear',    pitch: 0.6 },
-  dot:   { name: 'Dot',   zh: '小鸭',   fur: '#f6d54a', fur2: '#d8a92a', muz: '#f6d54a', shirt: '#7a62c0', ear: 'duck',    pitch: 1.2 },
-  rocky: { name: 'Rocky', zh: '浣熊',   fur: '#a4aab4', fur2: '#6a707c', muz: '#f0f0f0', shirt: '#d0603a', ear: 'raccoon', pitch: 0.85 },
+  mimi:  { name: 'Mimi',  zh: '小猫',   fur: '#f0a050', fur2: '#c87830', muz: '#fff4e0', shirt: '#5a8ad0', ear: 'cat', voice: 'af_bella' },
+  pip:   { name: 'Pip',   zh: '小兔',   fur: '#f6f2f0', fur2: '#d8d0d0', muz: '#ffffff', shirt: '#e07aa0', ear: 'bunny', voice: 'af_sarah' },
+  bruno: { name: 'Bruno', zh: '大熊',   fur: '#9a6a44', fur2: '#74492c', muz: '#d8b088', shirt: '#4e9a5c', ear: 'bear', voice: 'am_michael' },
+  dot:   { name: 'Dot',   zh: '小鸭',   fur: '#f6d54a', fur2: '#d8a92a', muz: '#f6d54a', shirt: '#7a62c0', ear: 'duck', voice: 'af_aoede' },
+  rocky: { name: 'Rocky', zh: '浣熊',   fur: '#a4aab4', fur2: '#6a707c', muz: '#f0f0f0', shirt: '#d0603a', ear: 'raccoon', voice: 'am_puck' },
 };
 function critSpr(who, f) {
   return spr(`cr:${who}:${f}`, () => sprite(20, 22, g => {
@@ -742,46 +744,158 @@ const SFX = {
   star: n => [660, 880, 1100].slice(0, Math.max(1, n)).forEach((f, i) => tone(f, .12, 'square', .045, i * .1)),
   chop: () => tone(140, .06, 'square', .06, 0, 70), sizzle: () => tone(2400, .25, 'sawtooth', .015, 0, 1800),
 };
-let VOICE = null;
-function pickVoice() {
-  if (!('speechSynthesis' in window)) return;
-  const en = speechSynthesis.getVoices().filter(v => /^en[-_]/i.test(v.lang));
-  VOICE = ['Samantha', 'Google US English', 'Microsoft Aria', 'Microsoft Jenny', 'Ava', 'Allison', 'Alex'].map(n => en.find(v => v.name.includes(n))).find(Boolean) || en.find(v => /en[-_]US/i.test(v.lang)) || en[0] || null;
+// ================= 示范发音：用 Kokoro 神经网络语音预先合成好的录音（voice.js），正常语速 + 逐词慢读 =================
+const MODEL_V = 'af_heart';
+const TTS_TEXT = { "Hi! I'm Doudou.": "Hi! I'm Doe-doe." };
+const WORD_TTS = { doudou: 'Doe-doe.' };
+const SILENT = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjYwLjE2LjEwMAAAAAAAAAAAAAAA//NExAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExFMAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKYAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKwAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKwAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKwAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVTEFNRTMu//NExKwAAANIAAAAADEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//NExKwAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+const VO = { el: null, token: 0, unlocked: false };
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const wordKey = t => t.toLowerCase().replace(/[‘’`]/g, "'").replace(/^[^a-z0-9']+|[^a-z0-9']+$/g, '');
+function wordSpeak(w) { if (WORD_TTS[w]) return WORD_TTS[w]; if (/^\d+$/.test(w)) return numWords(+w).replace(/ty (\w)/, 'ty-$1') + '.'; return w.replace(/^i(?=$|')/, 'I') + '.'; }
+function clipSrc(key) { const d = window.VOICE_CLIPS && window.VOICE_CLIPS[key]; return d ? 'data:audio/mpeg;base64,' + d : null; }
+function loadVoicePack() {
+  if (window.VOICE_CLIPS || document.getElementById('voicejs')) return;
+  const s = document.createElement('script'); s.id = 'voicejs'; s.src = 'voice.js'; s.async = true;
+  s.onerror = () => toast('发音包没加载上，暂时用浏览器自带朗读'); document.head.append(s);
 }
-if ('speechSynthesis' in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-function say(text, o = {}) {
-  if (!('speechSynthesis' in window)) { toast('这个浏览器不支持朗读'); return; }
-  try {
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; if (VOICE) u.voice = VOICE;
-    u.rate = o.slow ? .62 : S.cfg.rate; u.pitch = o.pitch || 1; speechSynthesis.speak(u);
-  } catch (e) { }
-}
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let srBroken = false, REC = null;
-const canListen = () => !!SR && !srBroken && S.cfg.mode !== 'self';
-function listen(onInterim) {
-  return new Promise((resolve, reject) => {
-    let r; try { r = new SR(); } catch (e) { reject('start'); return; }
-    REC = r; r.lang = 'en-US'; r.interimResults = true; r.maxAlternatives = 5; r.continuous = false;
-    let alts = [], err = null, settled = false, heardAudio = false;
-    const finish = () => { if (settled) return; settled = true; clearTimeout(timer); clearTimeout(hard); clearTimeout(noMic); REC = null; if (alts.length) resolve(alts); else reject(err || 'no-speech'); };
-    // 有的环境（被禁用的 iframe、无声卡的机器）既不报错也不开始录音：8 秒还没收到声音就放弃
-    r.onaudiostart = r.onsoundstart = () => { heardAudio = true; };
-    const noMic = setTimeout(() => { if (!heardAudio && !alts.length) { err = 'no-audio'; try { r.abort(); } catch (e) { } finish(); } }, 8000);
-    const timer = setTimeout(() => { try { r.stop(); } catch (e) { } }, 10000);
-    const hard = setTimeout(() => { try { r.abort(); } catch (e) { } finish(); }, 12500);
-    r.onresult = e => {
-      const res = Array.from(e.results), k = Math.max(...res.map(x => x.length)), list = [];
-      for (let a = 0; a < k; a++) list.push(res.map(x => x[Math.min(a, x.length - 1)].transcript).join(' ').trim());
-      alts = [...new Set(list)].filter(Boolean); if (onInterim && alts[0]) onInterim(alts[0]);
-    };
-    r.onerror = e => { err = e.error || 'error'; };
-    r.onend = finish;
-    try { r.start(); } catch (e) { err = 'start'; finish(); }
+function voEl() { if (!VO.el) { VO.el = new Audio(); VO.el.preload = 'auto'; } return VO.el; }
+// iOS 只允许在点击里第一次出声：第一次点击时用静音解锁同一个 <audio>，之后一直复用它
+function unlockVoice() { if (VO.unlocked) return; VO.unlocked = true; const el = voEl(); el.src = SILENT; el.play().catch(() => { VO.unlocked = false; }); }
+function playSrc(src) {
+  return new Promise(res => {
+    const el = voEl(); let done = false;
+    const fin = () => { if (done) return; done = true; clearTimeout(to); el.onended = el.onpause = el.onerror = null; res(); };
+    const to = setTimeout(fin, 9000);
+    el.onended = el.onpause = el.onerror = fin; el.src = src;
+    const pr = el.play(); if (pr) pr.catch(fin);
   });
 }
-function stopListen() { try { if (REC) REC.stop(); } catch (e) { } }
+function ttsSpeak(text, rate = .9) {
+  return new Promise(res => {
+    if (!('speechSynthesis' in window)) { res(); return; }
+    try { const u = new SpeechSynthesisUtterance(text); u.lang = 'en-US'; u.rate = rate; u.onend = u.onerror = () => res(); speechSynthesis.speak(u); setTimeout(res, 9000); } catch (e) { res(); }
+  });
+}
+function stopVoice() { VO.token++; if (VO.el) try { VO.el.pause(); } catch (e) { } if ('speechSynthesis' in window) try { speechSynthesis.cancel(); } catch (e) { } }
+// slow: 一个词一个词读，onWord(i) 用来高亮正在读的词（读完传 -1）
+async function say(text, o = {}) {
+  ac(); unlockVoice(); stopVoice(); const my = VO.token;
+  if (o.slow) {
+    const toks = tokensOf(text);
+    for (let i = 0; i < toks.length; i++) {
+      if (my !== VO.token) return;
+      if (o.onWord) o.onWord(i);
+      const src = clipSrc('w|' + wordKey(toks[i]));
+      if (src) await playSrc(src); else await ttsSpeak(toks[i], .7);
+      if (my !== VO.token) return;
+      await sleep(280);
+    }
+    if (o.onWord && my === VO.token) o.onWord(-1);
+    return;
+  }
+  const toks = tokensOf(text), src = clipSrc((o.voice || MODEL_V) + '|' + text) || (toks.length === 1 ? clipSrc('w|' + wordKey(text)) : null);
+  if (src) await playSrc(src); else await ttsSpeak(text);
+}
+// 游戏里所有要合成的句子（生成 voice.js 时从这里导出，保证和游戏内容一致）
+const priceOf = (r, q) => Math.round(r.price * [0, .8, 1, 1.25][q]);
+const allPrices = () => [...new Set(RECIPES.flatMap(r => [1, 2, 3].map(q => priceOf(r, q))))].sort((a, b) => a - b);
+function learnerLines() {
+  const out = [];
+  CROP_IDS.forEach(id => out.push(CROPS[id].say.en));
+  RECIPES.forEach(r => r.steps.forEach(s => out.push(s.en)));
+  T_REPLY.forEach(t => out.push(t.en));
+  allPrices().forEach(n => T_PRICE.forEach(t => out.push(fill(t.en, { n }))));
+  return out;
+}
+function guestLines() {
+  const out = [];
+  RECIPES.forEach(r => T_ORDER.forEach(t => (t.en.includes('{tod}') ? ['morning', 'afternoon', 'evening'] : ['']).forEach(tod => out.push(fill(t.en, { p: r.p, tod })))));
+  T_ASK.forEach(t => out.push(t.en)); T_THANKS.forEach(t => out.push(t.en));
+  return out;
+}
+function voiceInventory() {
+  const items = [], seen = new Set(), add = (key, voice, text, speed) => { if (!seen.has(key)) { seen.add(key); items.push({ key, voice, text, speed }); } };
+  [...learnerLines(), ...DD_LINES].forEach(t => add(MODEL_V + '|' + t, MODEL_V, TTS_TEXT[t] || t, .95));
+  Object.values(CRITTERS).forEach(k => guestLines().forEach(t => add(k.voice + '|' + t, k.voice, t, 1)));
+  const words = new Set();
+  [...learnerLines(), ...guestLines(), ...DD_LINES].forEach(t => tokensOf(t).forEach(x => words.add(wordKey(x))));
+  [...CROP_IDS, 'egg'].forEach(id => words.add(ITEMS[id].en)); Object.keys(VERB_INFO).forEach(w => words.add(w));
+  words.forEach(w => { if (w) add('w|' + w, MODEL_V, wordSpeak(w), .9); });
+  return items;
+}
+
+// ================= 离线语音识别：Vosk 英文小模型在浏览器里用 WebAssembly 运行 =================
+// 模型（约 40MB）第一次下载后由识别库存进 IndexedDB，以模型网址为键；之后断网也能用。
+const ASR_MODELS = ['vosk/vosk-model-small-en-us-0.15.tar.gz', 'https://ccoreilly.github.io/vosk-browser/models/vosk-model-small-en-us-0.15.tar.gz'];
+const ASR_KEY = 'doudou-asr-url';
+const ASR = { model: null, loading: null, state: 'none', err: '', t0: 0 };
+const MIC = { stream: null, timer: 0, blocked: false };
+let REC_STOP = null, GRAMMAR = null;
+const asrSaved = () => { try { return localStorage.getItem(ASR_KEY); } catch (e) { return null; } };
+function loadScript(src) { return new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('script')); document.head.append(s); }); }
+async function pickModelUrl() {
+  const saved = asrSaved(); if (saved) return saved;
+  for (const u of ASR_MODELS) { const abs = new URL(u, location.href).href; try { const r = await fetch(abs, { method: 'HEAD' }); if (r.ok) return abs; } catch (e) { } }
+  throw new Error('unreachable');
+}
+function loadASR() {
+  if (ASR.model) return Promise.resolve(ASR.model);
+  if (!ASR.loading) {
+    ASR.state = 'loading'; ASR.t0 = Date.now();
+    ASR.loading = (async () => {
+      if (!window.Vosk) await loadScript('vendor/vosk.js');
+      const url = await pickModelUrl();
+      const model = await new Promise((res, rej) => {
+        const m = new window.Vosk.Model(url, 0), to = setTimeout(() => rej(new Error('timeout')), 15 * 60000);
+        m.on('load', msg => { clearTimeout(to); if (msg.result) res(m); else rej(new Error('load')); });
+        m.on('error', msg => { clearTimeout(to); rej(new Error(msg.error || 'error')); });
+      });
+      try { localStorage.setItem(ASR_KEY, url); } catch (e) { }
+      ASR.model = model; ASR.state = 'ready'; return model;
+    })().catch(e => { ASR.loading = null; ASR.state = 'error'; ASR.err = (e && e.message) || String(e); throw e; });
+  }
+  return ASR.loading;
+}
+const asrErrText = () => ASR.err === 'unreachable' ? '下载不到模型，第一次需要联网' : ASR.err === 'script' ? '识别程序没加载上' : '这个浏览器跑不了离线识别';
+async function getMic() {
+  if (MIC.stream && MIC.stream.active) { clearTimeout(MIC.timer); return MIC.stream; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) throw new Error('no-mic');
+  MIC.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 } });
+  return MIC.stream;
+}
+function releaseMicSoon() { clearTimeout(MIC.timer); MIC.timer = setTimeout(() => { if (MIC.stream) { MIC.stream.getTracks().forEach(t => t.stop()); MIC.stream = null; } }, 20000); }
+// 宽松模式：只在游戏里出现过的句子和单词里找（含 [unk] 表示听不清的词），对口音更友好；严格模式不限词表
+function grammarJSON() {
+  if (GRAMMAR) return GRAMMAR;
+  const set = new Set(['[unk]']);
+  const keep = t => t.toLowerCase().replace(/[‘’`]/g, "'").replace(/\b\d+\b/g, m => numWords(+m)).replace(/-/g, ' ').replace(/[^a-z' ]/g, ' ').replace(/\s+/g, ' ').trim();
+  learnerLines().forEach(t => { set.add(keep(t)); set.add(normWords(t).join(' ')); });
+  entries().forEach(e => set.add(keep(e.en)));
+  GRAMMAR = JSON.stringify([...set].filter(Boolean)); return GRAMMAR;
+}
+function stopListen() { if (REC_STOP) REC_STOP(); }
+// 录一句话：说完停顿约 1.5 秒自动结束，也可以再点一次按钮结束；返回 { text, words:[{word,conf}] }
+async function recognize(onPartial) {
+  const model = await loadASR(), stream = await getMic(), ctx = ac();
+  const rec = new model.KaldiRecognizer(ctx.sampleRate, S.cfg.mode === 'strict' ? undefined : grammarJSON());
+  rec.setWords(true);
+  return new Promise(resolve => {
+    const texts = [], words = [], t0 = Date.now();
+    let stopping = false, done = false, partial = '', last = 0, tFin = 0;
+    const src = ctx.createMediaStreamSource(stream), node = ctx.createScriptProcessor(4096, 1, 1);
+    node.onaudioprocess = e => { if (!stopping) try { rec.acceptWaveform(e.inputBuffer); } catch (err) { } };
+    src.connect(node); node.connect(ctx.destination);
+    const unplug = () => { try { src.disconnect(); node.disconnect(); } catch (e) { } };
+    const finish = () => { if (done) return; done = true; REC_STOP = null; clearInterval(poll); clearTimeout(tFin); unplug(); setTimeout(() => { try { rec.remove(); } catch (e) { } }, 400); releaseMicSoon(); resolve({ text: texts.join(' ').trim(), words }); };
+    const stop = () => { if (stopping) return; stopping = true; unplug(); try { rec.retrieveFinalResult(); } catch (e) { } tFin = setTimeout(finish, 1500); };
+    rec.on('result', m => { const r = m.result || {}, t = (r.text || '').trim(); if (t) { texts.push(t); (r.result || []).forEach(w => words.push(w)); last = Date.now(); } partial = ''; if (stopping) finish(); });
+    rec.on('partialresult', m => { const p = ((m.result && m.result.partial) || '').trim(); if (p && p !== partial) { partial = p; last = Date.now(); if (onPartial) onPartial([...texts, p].join(' ')); } });
+    rec.on('error', finish);
+    const poll = setInterval(() => { const now = Date.now(), heard = texts.length || partial; if ((heard && now - last > 1500) || (!heard && now - t0 > 7000) || now - t0 > 15000) stop(); }, 200);
+    REC_STOP = stop;
+  });
+}
 // 打分：把目标句与识别结果都规整成单词序列，做加权最长公共子序列
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
 const TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
@@ -799,11 +913,17 @@ const tokensOf = en => en.split(/\s+/).filter(Boolean);
 function scoreSpeech(target, heard) {
   const toks = tokensOf(target), tw = [], owner = [];
   toks.forEach((t, i) => normWords(t).forEach(w => { tw.push(w); owner.push(i); }));
-  const hw = normWords(heard), n = tw.length, m = hw.length;
+  // heard 可以是字符串，也可以是离线识别结果 { text, words:[{word,conf}] }：置信度低的词只算「接近」
+  let hw, conf = null;
+  if (typeof heard === 'string') hw = normWords(heard);
+  else if (heard.words && heard.words.length) { hw = []; conf = []; heard.words.forEach(w => normWords(w.word).forEach(x => { hw.push(x); conf.push(w.conf); })); }
+  else hw = normWords(heard.text || '');
+  const simc = (a, b) => { let v = sim(tw[a], hw[b]); if (v > .6 && conf && conf[b] < .55) v = .6; return v; };
+  const n = tw.length, m = hw.length;
   const dp = Array.from({ length: n + 1 }, () => Array(m + 1).fill(0));
-  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) { let v = Math.max(dp[i - 1][j], dp[i][j - 1]); const s = sim(tw[i - 1], hw[j - 1]); if (s > 0) v = Math.max(v, dp[i - 1][j - 1] + s); dp[i][j] = v; }
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) { let v = Math.max(dp[i - 1][j], dp[i][j - 1]); const s = simc(i - 1, j - 1); if (s > 0) v = Math.max(v, dp[i - 1][j - 1] + s); dp[i][j] = v; }
   const got = Array(n).fill(0); let i = n, j = m;
-  while (i > 0 && j > 0) { const s = sim(tw[i - 1], hw[j - 1]); if (s > 0 && Math.abs(dp[i][j] - (dp[i - 1][j - 1] + s)) < 1e-9) { got[i - 1] = s; i--; j--; } else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--; }
+  while (i > 0 && j > 0) { const s = simc(i - 1, j - 1); if (s > 0 && Math.abs(dp[i][j] - (dp[i - 1][j - 1] + s)) < 1e-9) { got[i - 1] = s; i--; j--; } else if (dp[i - 1][j] >= dp[i][j - 1]) i--; else j--; }
   const score = n ? Math.round(100 * got.reduce((a, b) => a + b, 0) / n) : 0;
   const marks = toks.map((_, ti) => { const ks = owner.map((o, k) => o === ti ? k : -1).filter(k => k >= 0); return ks.length ? Math.min(...ks.map(k => got[k])) : 1; });
   return { score, marks };
@@ -831,32 +951,35 @@ function fx(text, lx, ly, cls = '') {
   $('#farmFx').append(el); setTimeout(() => el.remove(), cls === 'say' ? 2700 : 1300);
 }
 
-// ================= 口语卡：听 / 慢速 / 说 → 逐词标色 + 星级 =================
-function speakCard(item, { onResult, pitch = 1 } = {}) {
+// ================= 口语卡：正常语速 / 逐词慢读 / 说（离线识别）→ 逐词标色 + 星级 =================
+function speakCard(item, { onResult } = {}) {
   const toks = tokensOf(item.en), vs = item.v ? item.v.toLowerCase() : null, vstem = vs ? (vs.length > 4 ? vs.slice(0, -1) : vs) : null;
   const isV = t => vstem && t.toLowerCase().replace(/[^a-z]/g, '').startsWith(vstem);
   const el = h(`<div class="speak">
     <div class="sp-en" lang="en">${toks.map((t, i) => `<span class="w${isV(t) ? ' v' : ''}" data-i="${i}">${esc(t)}</span>`).join('')}</div>
     ${S.cfg.zh && item.zh ? `<div class="sp-zh">${esc(item.zh)}${item.ipa ? ` <span class="ipa">${esc(item.ipa)}</span>` : ''}</div>` : ''}
     <div class="sp-row">
-      <button class="btn blue" type="button" data-a="say">${uiImg('spk')}听</button>
-      <button class="btn blue" type="button" data-a="slow">慢速</button>
+      <button class="btn blue" type="button" data-a="say">${uiImg('spk')}正常</button>
+      <button class="btn blue" type="button" data-a="slow">逐词慢读</button>
       <button class="btn red mic" type="button" data-a="mic">${uiImg('mic')}<span>说</span></button>
     </div>
+    <div class="sp-dl" hidden><p>离线识别要先下载一次英文语音模型（约 40MB，建议连 Wi-Fi）。下载后存在手机里，之后断网也能用。</p><div class="row"><button class="btn green sm" type="button" data-a="dl">下载离线识别</button><button class="btn ghost sm" type="button" data-a="dlself">先用自评</button></div></div>
     <div class="sp-self" hidden><p>先听一遍，再大声跟读，然后给自己打个分：</p><div class="row"><button class="btn ghost sm" type="button" data-s="45">不太顺</button><button class="btn ghost sm" type="button" data-s="72">还可以</button><button class="btn ghost sm" type="button" data-s="92">很流利</button></div></div>
     <div class="sp-heard" aria-live="polite"></div>
     <div class="sp-res" aria-live="polite"></div>
   </div>`);
-  const mic = el.querySelector('[data-a=mic]'), micL = mic.querySelector('span'), heard = el.querySelector('.sp-heard'), res = el.querySelector('.sp-res'), selfBox = el.querySelector('.sp-self');
+  const mic = el.querySelector('[data-a=mic]'), micL = mic.querySelector('span'), heard = el.querySelector('.sp-heard'), res = el.querySelector('.sp-res'), selfBox = el.querySelector('.sp-self'), dlBox = el.querySelector('.sp-dl');
   const words = [...el.querySelectorAll('.sp-en .w')];
   let best = null, listening = false, tries = 0;
-  const label = () => { micL.textContent = !canListen() ? '我读完了' : listening ? '在听…再点结束' : tries ? '再说一次' : '说'; };
+  const selfMode = () => S.cfg.mode === 'self' || MIC.blocked;
+  const label = () => { micL.textContent = selfMode() ? '我读完了' : listening ? '在听…' : tries ? '再说' : '说'; };
+  const mark = i => words.forEach((w, k) => w.classList.toggle('cur', k === i));
   label();
-  el.querySelector('[data-a=say]').onclick = () => say(item.en, { pitch });
-  el.querySelector('[data-a=slow]').onclick = () => say(item.en, { slow: true, pitch });
+  el.querySelector('[data-a=say]').onclick = () => { mark(-1); say(item.en, { voice: item.voice }); };
+  el.querySelector('[data-a=slow]').onclick = () => say(item.en, { slow: true, onWord: mark });
   function result(score, marks) {
     tries++;
-    words.forEach((w, i) => { w.classList.remove('ok', 'part', 'miss'); if (marks) w.classList.add(marks[i] >= 1 ? 'ok' : marks[i] > 0 ? 'part' : 'miss'); });
+    words.forEach((w, i) => { w.classList.remove('ok', 'part', 'miss', 'cur'); if (marks) w.classList.add(marks[i] >= 1 ? 'ok' : marks[i] > 0 ? 'part' : 'miss'); });
     const st = starsOf(score);
     res.innerHTML = `${starsHTML(st, 3)}<span>${['再来一次', '加油', '不错', '完美！'][st]} · ${score} 分</span>`;
     SFX[st >= 2 ? 'star' : 'bad'](st);
@@ -868,27 +991,35 @@ function speakCard(item, { onResult, pitch = 1 } = {}) {
     save(); refreshHUD();
     if (onResult) onResult(best);
   }
+  const pretty = t => t.replace(/\[unk\]/g, '？');
+  async function prepare(download = false) {
+    try { await getMic(); } catch (e) { MIC.blocked = true; toast('拿不到麦克风，改成跟读自评'); selfBox.hidden = false; label(); return false; }
+    if (ASR.model) return true;
+    if (!download && !asrSaved() && ASR.state !== 'loading') { dlBox.hidden = false; return false; }
+    mic.disabled = true;
+    const tick = setInterval(() => { heard.textContent = (asrSaved() ? '正在载入离线识别…' : '正在下载离线识别模型…') + Math.round((Date.now() - ASR.t0) / 1000) + ' 秒'; }, 500);
+    try { await loadASR(); heard.textContent = ''; return true; }
+    catch (e) { heard.textContent = `离线识别没准备好：${asrErrText()}。先用自评。`; selfBox.hidden = false; return false; }
+    finally { clearInterval(tick); mic.disabled = false; }
+  }
+  el.querySelector('[data-a=dl]').onclick = async () => { dlBox.hidden = true; if (await prepare(true)) { heard.textContent = '离线识别准备好了，点「说」开始。'; SFX.coin(); } };
+  el.querySelector('[data-a=dlself]').onclick = () => { dlBox.hidden = true; selfBox.hidden = false; };
   selfBox.addEventListener('click', e => { const b = e.target.closest('[data-s]'); if (b) result(+b.dataset.s, null); });
   mic.onclick = async () => {
-    ac();
-    if (!canListen()) { selfBox.hidden = false; return; }
+    ac(); unlockVoice();
+    if (selfMode()) { selfBox.hidden = false; return; }
     if (listening) { stopListen(); return; }
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
-    listening = true; mic.classList.add('on'); label(); heard.textContent = '请大声说英文…';
+    stopVoice(); mark(-1);
+    if (!(await prepare())) return;
+    listening = true; mic.classList.add('on'); label(); heard.textContent = '请大声说英文，说完停一下（或再点一次按钮结束）';
     try {
-      const alts = await listen(t => { heard.textContent = '听到：' + t; });
-      const scored = alts.map(a => ({ a, ...scoreSpeech(item.en, a) })).sort((x, y) => y.score - x.score)[0];
-      heard.textContent = '听到：' + scored.a;
-      result(scored.score, scored.marks);
-    } catch (err) {
-      if (['not-allowed', 'service-not-allowed', 'audio-capture', 'network', 'start', 'language-not-supported'].includes(err)) {
-        srBroken = true; heard.textContent = ''; selfBox.hidden = false;
-        toast('这里用不了麦克风识别，已切换为跟读自评');
-      } else if (err === 'no-audio') { heard.textContent = '麦克风没有启动。可以再点一次，或者先用下面的自评。'; selfBox.hidden = false; }
-      else heard.textContent = err === 'no-speech' ? '没听到声音，靠近手机再说一次。' : '识别中断了，再试一次。';
-    } finally { listening = false; mic.classList.remove('on'); label(); }
+      const r = await recognize(p => { heard.textContent = '听到：' + pretty(p); });
+      if (!r.text) heard.textContent = '没听到声音，靠近手机再说一次。';
+      else { const sc = scoreSpeech(item.en, r); heard.textContent = '听到：' + pretty(r.text); result(sc.score, sc.marks); }
+    } catch (e) { heard.textContent = '识别出错了，再试一次。'; }
+    finally { listening = false; mic.classList.remove('on'); label(); }
   };
-  if (!canListen()) selfBox.hidden = false;
+  if (selfMode()) selfBox.hidden = false;
   return { el, get best() { return best; } };
 }
 
@@ -978,7 +1109,7 @@ function onFarmTap(e) {
   ac();
   const r = farmCv.getBoundingClientRect(), lx = (e.clientX - r.left) * 160 / r.width, ly = (e.clientY - r.top) * 150 / r.height;
   if (Math.abs(lx - 141) < 11 && ly > 50 && ly < 72) return tapNest();
-  if (Math.abs(lx - DD.x) < 9 && ly > 108 && ly < 138) { const line = DD_LINES[Math.floor(Math.random() * DD_LINES.length)]; DD.hop = 1; fx(line, DD.x, 104, 'say'); say(line, { pitch: 1.3 }); return; }
+  if (Math.abs(lx - DD.x) < 9 && ly > 108 && ly < 138) { const line = DD_LINES[Math.floor(Math.random() * DD_LINES.length)]; DD.hop = 1; fx(line, DD.x, 104, 'say'); say(line); return; }
   const k = plotAt(lx, ly); if (k >= 0) tapPlot(k);
 }
 function tapNest() {
@@ -1015,7 +1146,7 @@ function harvestTalk(id, n) {
   const ok = node.querySelector('[data-a=ok]');
   const card = speakCard({ k: c.say.en, en: c.say.en, zh: c.say.zh, v: c.en }, { onResult: r => { ok.disabled = false; ok.textContent = r.stars >= 3 ? '领取 +2' : r.stars >= 2 ? '领取 +1' : '领取（+0）'; } });
   node.querySelector('.slot').append(card.el);
-  const L = openLayer(node, { onClose: () => speechSynthesis && speechSynthesis.cancel() });
+  const L = openLayer(node, { onClose: stopVoice });
   node.querySelector('[data-a=skip]').onclick = () => L.close();
   ok.onclick = () => { const b = card.best ? (card.best.stars >= 3 ? 2 : card.best.stars >= 2 ? 1 : 0) : 0; if (b) { addTo(S.inv, id, b); toast(`口语奖励：再得 ${b} 个${c.zh}`); SFX.coin(); } save(); L.close(); };
   say(c.say.en);
@@ -1165,7 +1296,7 @@ function startCook(rid) {
     <div class="scene-wrap px"><canvas class="scene" width="160" height="84" aria-label="豆豆在厨房做菜"></canvas></div>
     <div class="ck-body"></div>
   </div>`);
-  const L = openLayer(node, { full: true, onClose: () => { COOK = null; if ('speechSynthesis' in window) speechSynthesis.cancel(); stopListen(); } });
+  const L = openLayer(node, { full: true, onClose: () => { COOK = null; stopVoice(); stopListen(); } });
   const cv = node.querySelector('canvas'), g = cv.getContext('2d'); g.imageSmoothingEnabled = false;
   COOK = { r, i: 0, stars: [], L, node, g, act: { act: r.steps[0].act, ing: r.steps[0].ing }, anim: null, pt: [], done: false };
   node.querySelector('[data-a=x]').onclick = () => L.close();
@@ -1197,7 +1328,7 @@ function finishCook() {
   ck.node.querySelectorAll('.pips i').forEach(el => { el.className = 'done'; });
   SFX.lvl();
   const body = ck.node.querySelector('.ck-body');
-  body.innerHTML = `<div class="big">${dishImg(r.id, 5)}<h3>${r.zh} 做好了！</h3>${starsHTML(q, 4)}<p class="muted">平均每步 ${avg.toFixed(1)} 星 · 售价 ${coinHTML(Math.round(r.price * [0, .8, 1, 1.25][q]))} · +${10 + q * 5} XP</p></div>
+  body.innerHTML = `<div class="big">${dishImg(r.id, 5)}<h3>${r.zh} 做好了！</h3>${starsHTML(q, 4)}<p class="muted">平均每步 ${avg.toFixed(1)} 星 · 售价 ${coinHTML(priceOf(r, q))} · +${10 + q * 5} XP</p></div>
     <div class="row end">${canCook(r) ? '<button class="btn ghost" type="button" data-a="again">再做一份</button>' : ''}<button class="btn ghost" type="button" data-a="k">回厨房</button><button class="btn green" type="button" data-a="d">去小馆上菜</button></div>`;
   body.querySelector('[data-a=k]').onclick = () => ck.L.close();
   body.querySelector('[data-a=d]').onclick = () => { ck.L.close(); go('diner'); };
@@ -1241,7 +1372,7 @@ function serve(cid) {
   const c = S.cust.find(x => x.id === cid); if (!c) return;
   const r = RECIPE[c.dish], have = S.dishes.filter(d => d.id === c.dish).sort((a, b) => b.q - a.q)[0];
   if (!have) { toast('还没有这道菜，先去厨房做'); return; }
-  const k = CRITTERS[c.who], price = Math.round(r.price * [0, .8, 1, 1.25][have.q]), pick = a => a[Math.floor(Math.random() * a.length)];
+  const k = CRITTERS[c.who], price = priceOf(r, have.q), pick = a => a[Math.floor(Math.random() * a.length)];
   const hr = new Date().getHours(), tod = hr < 12 ? 'morning' : hr < 18 ? 'afternoon' : 'evening', todzh = hr < 12 ? '早上' : hr < 18 ? '下午' : '晚上';
   const o = pick(T_ORDER), rp = pick(T_REPLY), as = pick(T_ASK), pr = pick(T_PRICE), th = pick(T_THANKS);
   const script = [
@@ -1252,19 +1383,21 @@ function serve(cid) {
     { who: 'c', en: th.en, zh: th.zh },
   ];
   const node = h(`<div class="list"><div class="row" style="flex-wrap:nowrap">${critImg(c.who, 3)}<div><h3>${k.name} <span class="muted" style="font-size:14px">${k.zh}</span></h3><p class="lead">想要 ${r.zh} · 你的库存最好是 ${have.q} 星</p></div></div><div class="chat"></div><div class="act"></div></div>`);
-  const L = openLayer(node, { full: true, onClose: () => { if ('speechSynthesis' in window) speechSynthesis.cancel(); stopListen(); } });
+  const L = openLayer(node, { full: true, onClose: () => { stopVoice(); stopListen(); } });
   const chat = node.querySelector('.chat'), act = node.querySelector('.act'), scores = [];
   let idx = 0;
   const bubble = (who, s, stars) => {
-    const b = h(`<div class="bub ${who}">${who === 'c' ? critImg(c.who, 2) : ''}<div class="txt"><p class="e" lang="en"></p>${S.cfg.zh ? '<p class="z"></p>' : ''}${who === 'c' ? `<button class="btn blue sm" type="button">${uiImg('spk')}再听</button>` : `<span class="tag">${starsHTML(stars, 2)}</span>`}</div>${who === 'me' ? im('dd:chef:0', ddSpr('chef', 0), 2) : ''}</div>`);
+    const b = h(`<div class="bub ${who}">${who === 'c' ? critImg(c.who, 2) : ''}<div class="txt"><p class="e" lang="en"></p>${S.cfg.zh ? '<p class="z"></p>' : ''}${who === 'c' ? `<div class="row" style="gap:4px"><button class="btn blue sm" type="button" data-a="n">${uiImg('spk')}再听</button><button class="btn blue sm" type="button" data-a="w">逐词慢读</button></div>` : `<span class="tag">${starsHTML(stars, 2)}</span>`}</div>${who === 'me' ? im('dd:chef:0', ddSpr('chef', 0), 2) : ''}</div>`);
     b.querySelector('.e').textContent = s.en; const z = b.querySelector('.z'); if (z) z.textContent = s.zh;
-    const btn = b.querySelector('button'); if (btn) btn.onclick = () => say(s.en, { pitch: k.pitch });
+    const bn = b.querySelector('[data-a=n]'), bw = b.querySelector('[data-a=w]');
+    if (bn) bn.onclick = () => say(s.en, { voice: k.voice });
+    if (bw) bw.onclick = () => say(s.en, { slow: true });
     chat.append(b); b.scrollIntoView({ block: 'nearest' });
   };
   const step = () => {
     const s = script[idx];
     if (!s) return done();
-    if (s.who === 'c') { bubble('c', s); say(s.en, { pitch: k.pitch }); idx++; if (idx >= script.length) return done(); }
+    if (s.who === 'c') { bubble('c', s); say(s.en, { voice: k.voice }); idx++; if (idx >= script.length) return done(); }
     const m = script[idx];
     act.innerHTML = `<div class="list"><p class="eyebrow">轮到你说</p><div class="slot"></div><div class="row end"><button class="btn green" type="button" data-a="n" disabled>说完了</button></div></div>`;
     const nb = act.querySelector('[data-a=n]');
@@ -1298,7 +1431,7 @@ function entries() {
 let WF = 'all';
 function practice(list, title) {
   const node = h(`<div class="list"><div class="row" style="justify-content:space-between"><h3>${title}</h3><span class="muted" data-c></span></div><div class="slot"></div><div class="row end"><button class="btn ghost" type="button" data-a="x">结束</button><button class="btn green" type="button" data-a="n" disabled>下一个</button></div></div>`);
-  const L = openLayer(node, { full: list.length > 1, onClose: () => { if ('speechSynthesis' in window) speechSynthesis.cancel(); stopListen(); } });
+  const L = openLayer(node, { full: list.length > 1, onClose: () => { stopVoice(); stopListen(); } });
   let i = 0, got = 0, card = null;
   const nb = node.querySelector('[data-a=n]');
   const show = () => {
@@ -1328,28 +1461,35 @@ function drill() {
 
 // ================= 设置 / 升级 =================
 function openSettings() {
-  const st = SR ? (srBroken ? '这个环境拿不到麦克风，正在用跟读自评。' : '浏览器支持语音识别，第一次点「说」时会请求麦克风权限。') : '这个浏览器没有语音识别（建议用手机 Chrome 或 Safari 打开），会用跟读自评。';
+  const MODES = { auto: ['离线识别 · 宽松', '只在游戏里出现过的句子和单词里找，口音重一些也能认出来（推荐）'], strict: ['离线识别 · 严格', '不限词表，说错的词会被认成别的词，更能暴露发音问题'], self: ['跟读自评', '不用麦克风，听完跟读后自己打分'] };
   const node = h(`<div class="list"><h3>设置</h3>
     <div class="li"><span></span><span><b>显示中文提示</b><br><span class="meta">关掉后只看英文，更有挑战</span></span><button class="btn sm" type="button" data-t="zh"></button></div>
     <div class="li"><span></span><span><b>收获时口语挑战</b><br><span class="meta">每次收获弹出一句跟读，说好多拿作物</span></span><button class="btn sm" type="button" data-t="talk"></button></div>
     <div class="li"><span></span><span><b>音效</b></span><button class="btn sm" type="button" data-t="sfx"></button></div>
-    <div class="li"><span></span><span><b>评分方式</b><br><span class="meta">${st}</span></span><button class="btn sm" type="button" data-m></button></div>
-    <div class="li"><span></span><span><b>朗读语速</b></span><button class="btn sm" type="button" data-r></button></div>
+    <div class="sec">口语</div>
+    <div class="li"><span></span><span><b>评分方式</b><br><span class="meta" data-md></span></span><button class="btn sm" type="button" data-m></button></div>
+    <div class="li"><span></span><span><b>离线识别模型</b><br><span class="meta" data-as></span></span><span class="row" style="gap:2px"><button class="btn sm green" type="button" data-a="asr"></button><button class="btn sm ghost" type="button" data-a="asrdel" hidden>删除</button></span></div>
+    <p class="lead">示范发音是预先合成好的标准美式发音（Kokoro 神经网络语音），不需要联网。识别在手机本地运行，录音不会上传。</p>
     <div class="sec">存档</div>
     <p class="lead">存档保存在这台设备的浏览器里${CLOUD ? '，并同步到你的 Claude 账号' : ''}。已经说过 ${S.stats.spoken} 句英语，做过 ${S.stats.cook} 道菜，接待过 ${S.stats.serve} 位客人。</p>
     <div class="row"><button class="btn red sm" type="button" data-a="reset">重新开始</button><span data-confirm hidden class="row"><span class="lead">进度会全部清空，确定吗？</span><button class="btn red sm" type="button" data-a="yes">确定清空</button></span></div>
     <div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button></div></div>`);
-  const L = openLayer(node);
+  const L = openLayer(node, { onClose: () => clearInterval(iv) });
   const draw = () => {
     node.querySelectorAll('[data-t]').forEach(b => { const on = S.cfg[b.dataset.t]; b.textContent = on ? '开' : '关'; b.className = 'btn sm ' + (on ? 'green' : 'ghost'); });
-    node.querySelector('[data-m]').textContent = S.cfg.mode === 'self' ? '跟读自评' : '自动识别';
-    node.querySelector('[data-r]').textContent = { .8: '慢', .9: '中', 1: '正常' }[S.cfg.rate] || '中';
+    const md = MODES[S.cfg.mode] || MODES.auto; node.querySelector('[data-m]').textContent = md[0]; node.querySelector('[data-md]').textContent = MIC.blocked ? '这里拿不到麦克风，只能跟读自评。' : md[1];
+    const as = node.querySelector('[data-as]'), ab = node.querySelector('[data-a=asr]'), del = node.querySelector('[data-a=asrdel]');
+    as.textContent = ASR.state === 'ready' ? '已就绪，可以断网使用' : ASR.state === 'loading' ? `准备中… ${Math.round((Date.now() - ASR.t0) / 1000)} 秒` : ASR.state === 'error' ? `没准备好：${asrErrText()}` : asrSaved() ? '已下载，打开「说」时载入' : '还没下载（约 40MB，只下载一次）';
+    ab.textContent = ASR.state === 'ready' ? '已就绪' : asrSaved() ? '载入' : '下载'; ab.disabled = ASR.state === 'ready' || ASR.state === 'loading';
+    del.hidden = !asrSaved() || ASR.state === 'loading';
   };
+  const iv = setInterval(draw, 1000);
   draw();
   node.addEventListener('click', e => {
     const t = e.target.closest('[data-t]'); if (t) { S.cfg[t.dataset.t] = !S.cfg[t.dataset.t]; save(); draw(); return; }
-    if (e.target.closest('[data-m]')) { S.cfg.mode = S.cfg.mode === 'self' ? 'auto' : 'self'; save(); draw(); return; }
-    if (e.target.closest('[data-r]')) { S.cfg.rate = S.cfg.rate === .8 ? .9 : S.cfg.rate === .9 ? 1 : .8; save(); draw(); say('Fresh tomatoes from my farm.'); return; }
+    if (e.target.closest('[data-m]')) { const ks = Object.keys(MODES); S.cfg.mode = ks[(ks.indexOf(S.cfg.mode) + 1) % ks.length]; save(); draw(); return; }
+    if (e.target.closest('[data-a=asr]')) { loadASR().then(() => toast('离线识别准备好了'), () => toast('离线识别没准备好：' + asrErrText())).finally(draw); draw(); return; }
+    if (e.target.closest('[data-a=asrdel]')) { try { if (ASR.model) ASR.model.terminate(); } catch (er) { } Object.assign(ASR, { model: null, loading: null, state: 'none' }); try { localStorage.removeItem(ASR_KEY); indexedDB.deleteDatabase('/vosk'); } catch (er) { } toast('已删除离线识别模型'); draw(); return; }
     if (e.target.closest('[data-a=reset]')) { node.querySelector('[data-confirm]').hidden = false; return; }
     if (e.target.closest('[data-a=yes]')) { S = newGame(); S.intro = false; save(); L.close(); toast('已经重新开始'); return; }
     if (e.target.closest('[data-a=x]')) L.close();
@@ -1409,7 +1549,7 @@ function renderIntro() {
     <li>在农场点地块：播种、捉虫、除草、浇水、收获。收获时跟读一句英文，说得好多拿作物。</li>
     <li>去厨房用食材做菜。每一步都要说出英文做法，平均星级决定菜的品质和价格。</li>
     <li>在小馆接待客人：听懂点单，用英语回答、报价，口语好还有小费。</li></ol>
-    <p class="muted">${SR ? '点「说」会请求麦克风权限；用不了麦克风时，会自动改成跟读后自评。' : '这个浏览器不支持语音识别，会用「听 → 跟读 → 自评」的方式练习。'}</p>`;
+    <p class="muted">每句英文都有「正常」和「逐词慢读」两种示范。第一次点「说」会请求麦克风权限，并提示下载约 40MB 的离线识别模型，之后断网也能用。</p>`;
 }
 function renderKitchen() {
   $('#recipes').innerHTML = RECIPES.map(r => {
@@ -1464,6 +1604,14 @@ function frame(t) {
   if (VIEW === 'farm') drawFarm(t); else if (VIEW === 'diner') drawDiner(t);
   if (COOK) drawCook(t);
 }
+// 单独打开（GitHub Pages / githack）时：可安装到主屏幕，并用 Service Worker 离线缓存；在 claude.ai 里不启用
+function setupPWA() {
+  if (window.claude || !('serviceWorker' in navigator) || !window.isSecureContext || location.protocol === 'file:') return;
+  [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icon-192.png']].forEach(([rel, href]) => { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.append(l); });
+  navigator.serviceWorker.register('sw.js').catch(() => { });
+  // 英文学习文本用的字体首屏用不到，主动加载一次，让离线缓存也存上
+  if (document.fonts) document.fonts.load('20px "Jersey 10"').catch(() => { });
+}
 function boot() {
   S = loadLocal() || newGame();
   simulate(Date.now() - S.last); S.last = Date.now(); ensureQuests();
@@ -1492,7 +1640,11 @@ function boot() {
   });
   $('#stage').addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('[data-w]')) { e.preventDefault(); e.target.click(); } });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { save(false); pushCloud(true); } else tick(); });
+  document.addEventListener('pointerdown', () => { ac(); unlockVoice(); }, { once: true, capture: true });
   go('farm');
+  loadVoicePack();
+  if (asrSaved()) setTimeout(() => loadASR().catch(() => { }), 2500);
+  setupPWA();
   setInterval(tick, 1000);
   requestAnimationFrame(frame);
   initCloud();

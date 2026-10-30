@@ -3,3 +3,4 @@ node_modules/
 sheet/brush/*.tgz
 sheet/brush/x_p5/
 sheet/brush/x_brush/
+game/vosk/
