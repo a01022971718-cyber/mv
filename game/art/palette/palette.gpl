@@ -1,0 +1,87 @@
+GIMP Palette
+Name: Doudou Farm
+Columns: 6
+#
+ 66  38  38	outline-0
+ 78  50  38	outline-1
+ 94  34  26	outline-2
+ 86  62  50	soil-0
+110  78  62	soil-1
+138  86  58	soil-2
+170 130 106	soil-3
+110  50  18	wood-0
+142  66  38	wood-1
+174 110  66	wood-2
+202 134  98	wood-3
+198 154 126	skin-0
+214 146 110	skin-1
+226 162 122	skin-2
+234 202 182	skin-3
+130  86  22	gold-0
+162 114  38	gold-1
+210 134  18	gold-2
+230 146  50	gold-3
+234 198  62	gold-4
+234 210 122	gold-5
+130 106  70	sand-0
+178 154  90	sand-1
+214 186 118	sand-2
+222 198 134	sand-3
+234 222 182	sand-4
+238 230 206	sand-5
+ 46  58  14	grass-0
+ 94 142  34	grass-1
+118 170  42	grass-2
+142 190  58	grass-3
+154 202  66	grass-4
+210 206 110	grass-5
+ 18  86  22	leaf-0
+ 18 122  50	leaf-1
+ 30 166  62	leaf-2
+126 186 102	leaf-3
+ 46 102  82	teal-0
+ 54 126  98	teal-1
+ 66 150 114	teal-2
+134 210 190	teal-3
+ 26 102 110	sky-0
+ 74 166 202	sky-1
+ 50 186 234	sky-2
+102 210 234	sky-3
+150 222 234	sky-4
+ 94  34  26	red-0
+130  50  42	red-1
+166  38  30	red-2
+202  58  54	red-3
+238 118 118	red-4
+158  42  94	pink-0
+214  70 114	pink-1
+222 146 202	pink-2
+178 134 214	pink-3
+230 210 226	pink-4
+ 66  70  78	gray-0
+ 82 106 110	gray-1
+122 146 154	gray-2
+170 202 206	gray-3
+230 198 158	panel-0
+226 210 178	panel-1
+234 222 198	panel-2
+ 82  46  26	frame-0
+122  54  22	frame-1
+150  82  42	frame-2
+190 130  74	frame-3
+194 118  10	btn_gold-0
+230 194 114	btn_gold-1
+238 218 146	btn_gold-2
+ 46  62 114	btn_blue-0
+ 66 102 170	btn_blue-1
+110 158 230	btn_blue-2
+170 214  86	accent-0
+234 230  78	accent-1
+ 62  58  58	ui_gray-0
+134 134 134	ui_gray-1
+190 190 190	ui_gray-2
+238 238 238	ui_gray-3
+ 66  50 154	violet-0
+102  82 186	violet-1
+154 138 238	violet-2
+194 174 246	violet-3
