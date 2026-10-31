@@ -4,14 +4,14 @@
   python3 game/tools/palette_check.py 素材.png              # 只检查：平均色差、偏离最多的颜色
   python3 game/tools/palette_check.py 素材.png 输出.png     # 检查并输出校准版（每个像素换成色卡里最近的颜色）
 色差用 CIE Lab 距离：小于 8 基本看不出差别，8–15 能看出偏色，大于 15 明显不是一套颜色。
-校准时最暗的像素（描边）统一换成「描边·暗部」组的暖深棕。
+校准时最暗的像素（描边）统一换成「暖灰·墨」第 1–2 级。
 校准只适合角色、作物、道具这类单独的像素素材；整张手绘背景不要硬换，会出现一条条色带。
 需要 opencv-python、numpy。
 """
 import cv2, numpy as np, json, sys, os
 PAL = json.load(open(os.path.join(os.path.dirname(__file__), '..', 'art', 'palette', 'palette.json')))
-hexs = [c for g in PAL['scene'] + PAL['ui'] for c in g['colors']]   # 整张色卡（场景 + 界面）
-OUTLINE = [hexs.index(c) for c in PAL['scene'][0]['colors']]   # 描边·暗部 组
+hexs = [c for r in PAL['ramps'] for c in r['colors']]   # 整张色卡 v2（16 组 × 8 级）
+OUTLINE = [hexs.index(c) for c in PAL['ramps'][0]['colors'][:2]]   # 描边用「暖灰·墨」第 1–2 级
 rgb = np.array([[int(h[i:i + 2], 16) for i in (1, 3, 5)] for h in hexs], np.uint8)
 tolab = lambda a: cv2.cvtColor((np.asarray(a, np.float32) / 255).reshape(-1, 1, 3)[..., ::-1], cv2.COLOR_BGR2LAB).reshape(-1, 3)
 P = tolab(rgb)
@@ -32,7 +32,7 @@ def main(src, dst=None):
         u, c = np.unique(far, axis=0, return_counts=True)
         print('偏离最多的颜色：' + ' '.join('#%02x%02x%02x' % tuple(x) for x, n in sorted(zip(u, c), key=lambda t: -t[1])[:8]))
     if dst:
-        dark = lum < 22   # 最暗的像素（描边）按规矩换成暖深棕，不管它原来是黑还是深蓝
+        dark = lum < 24   # 最暗的像素（描边）按规矩换成「暖灰·墨」第 1–2 级，不管它原来是黑还是深蓝
         Lo = P[OUTLINE]; idx[dark] = np.array(OUTLINE)[np.abs(lum[dark, None] - Lo[None, :, 0]).argmin(1)]
         out = im.copy(); q = out[m]; q[:, :3] = rgb[idx][:, ::-1]; out[m] = q
         cv2.imwrite(dst, out); print('校准版：', dst)
