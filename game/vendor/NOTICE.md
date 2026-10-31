@@ -1,5 +1,6 @@
 # 第三方代码与素材
 
+- `phaser.min.js`：[Phaser](https://phaser.io) 3.90.0（npm 包里的 `dist/phaser-arcade-physics.min.js`，不含 Matter 物理），MIT 许可，见 `LICENSE-phaser.md`。农场画面用它渲染。
 - `vosk.js`：[vosk-browser](https://github.com/ccoreilly/vosk-browser) 0.0.8（npm 包里的 `dist/vosk.js`），Vosk / Kaldi 的 WebAssembly 版本，Apache-2.0 许可。
   **改动**：用 `../tools/patch_vosk.py` 给内嵌的 worker 加了下载进度上报（`dlprogress` 消息），其余未改。
 - 识别模型 `vosk-model-small-en-us-0.15`（[alphacephei](https://alphacephei.com/vosk/models)，Apache-2.0）不放在仓库里。游戏先找同目录下的 `vosk/vosk-model-small-en-us-0.15.tar.gz`，找不到就从 vosk-browser 作者的 GitHub Pages 下载同一个模型，下载一次后存在浏览器里。
