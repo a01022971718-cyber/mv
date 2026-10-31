@@ -12,6 +12,7 @@
 ## 我们自己的记忆点
 
 - **会说英语的蔬菜**：8 种作物各有独特的轮廓和主色（圆红番茄、尖橙胡萝卜、疙瘩土豆、紫洋葱、高个玉米、褶边生菜、心形草莓、扁圆南瓜）。成熟后长出小脸，表情来自它的英文收获句：番茄 *red and ripe* 会脸红，洋葱 *Onions make me cry!* 会流泪，土豆 *Dig up the potatoes* 埋在土里打瞌睡，南瓜 *What a big pumpkin!* 一脸得意。成熟的菜还会轮流冒出气泡喊自己的英文名。
+- **作者原画的两种作物**：精灵芽 *sprout*（Lv2，土垄上那三只绿色精灵的同类）和蓝铃花 *bluebell*（Lv4，和 Swirl 一样的蓝色漩涡花），种子店能买，长大和成熟时直接显示作者画的图。收获句：*The sprout is smiling at me!* / *Listen! The bluebell is singing.*
 - **点哪儿学哪儿**：农场里的房子、稻草人、信箱、信箱上的蘑菇、木牌、草垛、树、花、栅栏、山、母鸡、窝都能点，点一下弹出英文名牌并读出来。左上角「标签」按钮一次显示所有名牌。这些词也收在词本的「场景」分类里。
 - **土垄上的四只植物精灵**（原画角色）：三只绿色的 Sprig 小芽、Bud 苞苞、Sunny 阳阳，和蓝色漩涡花 Swirl 旋旋。点一下会用自己的声音说一句英文（下面跟中文），每次换一句；12 句台词也收在词本的「精灵」分类里，可以跟读练习。
 - **农场画面**：用的是作者自己画的一整张农场图（`art/farm.webp`）。图里的 12 块草格就是地块，开垦后换成和精灵脚下那条土垄一样的土（贴图直接取自原画土垄，中间有同样的种植小坑，干的时候颜色泛白）；作物、豆豆、母鸡和鸡窝、气泡、名牌叠在图上。图里的稻草人女孩、土垄上的三只植物精灵、蘑菇信箱、大雏菊都原样保留。
@@ -78,6 +79,7 @@
 |---|---|
 | `index.html` | 游戏本体（除农场底图外，像素画都由代码逐像素绘制） |
 | `art/farm.webp` | 农场底图（作者原画，2048×1152） |
+| `art/crop-*.png`、`art/src/` | 作者画的作物（抠好白底、缩到原画比例的版本，和原图） |
 | `voice.js` | 示范发音包，由 `voiceInventory()` 导出的清单生成，不要手改 |
 | `vendor/vosk.js` | 离线识别库（第三方，见 `vendor/NOTICE.md`） |
 | `sw.js`、`manifest.webmanifest`、`icon-*.png` | 离线缓存和安装到主屏幕 |
@@ -85,6 +87,7 @@
 | `tools/build_fonts.py` | 把用到的字抽成子集、内联进 `index.html`（改了中文后运行） |
 | `tools/patch_vosk.py` | 给识别库加下载进度上报（已打过，升级识别库后要重跑） |
 | `tools/export_inventory.js`、`tools/gen_voice.py` | 导出发音清单并用 Kokoro 重新生成 `voice.js` |
+| `tools/cut_sprite.py` | 把作者画的白底图抠成透明 PNG 并缩到农场原画的比例 |
 | `tools/soil_tiles.py` | 从农场原画的土垄取样，生成开垦地块的贴图（结果内联在 `index.html` 的 `SOIL_IMG`） |
 
 ## 手绘素材规格（想用自己的画替换代码画的角色时）
@@ -107,7 +110,7 @@
 
 ## 改内容
 
-数据都在 `index.html` 的「游戏数据」一节：`CROPS`（作物、生长秒数、收获句）、`RECIPES`（菜谱和每一步的英文）、`T_ORDER` / `T_REPLY` / `T_ASK` / `T_PRICE` / `T_THANKS`（小馆对话模板）。新增一步做菜时，`act` 决定厨房里播放哪个动画（wash / cut / peel / tear / scoop / mix / crack / mash / heat / fry / boil / blend / pour / season / bake / serve）。
+数据都在 `index.html` 的「游戏数据」一节：`CROPS`（作物、生长秒数、收获句；带 `art` 的用 `art/` 里的图）、`RECIPES`（菜谱和每一步的英文）、`T_ORDER` / `T_REPLY` / `T_ASK` / `T_PRICE` / `T_THANKS`（小馆对话模板）。新增一步做菜时，`act` 决定厨房里播放哪个动画（wash / cut / peel / tear / scoop / mix / crack / mash / heat / fry / boil / blend / pour / season / bake / serve）。
 
 换农场底图：替换 `art/farm.webp`，再按新图更新 `index.html` 里这几处原图像素坐标——`PLOT_IMG`（每块草格的中心）、`LAT`（相邻两格中心之差，决定土层形状和点击判定）、`SPOTS`（可点物件的矩形和名牌位置）、`HOUSE_WIN`（夜里亮灯的窗户）、`NEST`、母鸡和豆豆走动的范围；图的宽高变了还要改 `FARM.world` 和样式里的 384px。
 

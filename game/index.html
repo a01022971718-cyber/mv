@@ -38,6 +38,7 @@ body{height:100%;margin:0;font-family:var(--f-ui);font-size:18px;line-height:1.5
 b,strong,h2,h3{font-weight:400}
 .gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 #app{height:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column}
+.arti{display:inline-block;vertical-align:middle;flex:none;object-fit:contain}
 .pix{image-rendering:pixelated;image-rendering:crisp-edges;display:inline-block;vertical-align:middle;flex:none}
 .px{background:var(--paper);color:var(--ink);box-shadow:var(--pb);margin:2px}
 h2,h3{margin:0;text-wrap:balance}
@@ -515,7 +516,7 @@ function cropSpr(id, st, f = 0) {
       else if (id === 'corn') { R(g, 13, 22, 2, 9, C.stem); L(g, 13, 27, 7, 22, C.leaf, 2); L(g, 15, 25, 21, 20, C.leafHi, 2); }
       else { L(g, 14, 31, 14, 24, C.stem); leafy(g, 10, 25, 4, 2.4); leafy(g, 18, 23, 4, 2.4); }
     }
-    else CD[id](g, st, f);
+    else if (CD[id]) CD[id](g, st, f);
   }));
 }
 const deadSpr = () => spr('dead', () => sprite(28, 32, g => { L(g, 13, 31, 10, 20, PAL.w1); L(g, 15, 31, 18, 21, PAL.w2); L(g, 14, 31, 14, 24, PAL.w0); P(g, 9, 19, PAL.w1); P(g, 8, 20, PAL.w0); P(g, 19, 20, PAL.w2); P(g, 19, 22, PAL.w0); }));
@@ -625,7 +626,7 @@ const tabSpr = k => spr('tab:' + k, () => sprite(11, 11, TAB_ICON[k]));
 // 精灵 → <img>（data URL 缓存）
 const URLS = new Map();
 function im(key, canvas, s = 2, extra = '') { let u = URLS.get(key); if (!u) { u = canvas.toDataURL(); URLS.set(key, u); } return `<img class="pix" src="${u}" width="${canvas.width * s}" height="${canvas.height * s}" alt=""${extra}>`; }
-const itemImg = (id, s = 2) => im('it:' + id, itemSpr(id), s);
+const itemImg = (id, s = 2) => ITEMS[id] && ITEMS[id].art ? `<img class="arti" src="${ITEMS[id].art}" width="${12 * s}" height="${12 * s}" alt="">` : im('it:' + id, itemSpr(id), s);
 const dishImg = (id, s = 2) => im('di:' + id, dishSpr(id), s);
 const uiImg = (n, s = 2, dim) => im(`ui:${n}:${dim ? 1 : 0}`, uiSpr(n, dim), s);
 const critImg = (w, s = 2) => im('cr:' + w, critSpr(w, 0), s);
@@ -637,12 +638,16 @@ const CROPS = {
   carrot:     { zh: '胡萝卜', en: 'carrot',     ipa: '/ˈkærət/',     lv: 1, seed: 3,  sell: 3,  grow: 80,  yield: 3, xp: 4,  say: { en: 'Pull up the carrots.', zh: '把胡萝卜拔出来。' } },
   tomato:     { zh: '番茄',   en: 'tomato',     ipa: '/təˈmeɪtoʊ/',  lv: 1, seed: 4,  sell: 4,  grow: 100, yield: 3, xp: 5,  say: { en: 'The tomatoes are red and ripe.', zh: '番茄又红又熟。' } },
   potato:     { zh: '土豆',   en: 'potato',     ipa: '/pəˈteɪtoʊ/',  lv: 2, seed: 5,  sell: 4,  grow: 120, yield: 4, xp: 6,  say: { en: 'Dig up the potatoes.', zh: '把土豆挖出来。' } },
+  sprout:     { zh: '精灵芽', en: 'sprout',     ipa: '/spraʊt/',     lv: 2, seed: 6,  sell: 7,  grow: 150, yield: 2, xp: 8,  art: 'art/crop-sprout.png', say: { en: 'The sprout is smiling at me!', zh: '精灵芽在对我笑！' } },
   onion:      { zh: '洋葱',   en: 'onion',      ipa: '/ˈʌnjən/',     lv: 3, seed: 5,  sell: 5,  grow: 120, yield: 3, xp: 6,  say: { en: 'Onions make me cry!', zh: '洋葱让我流眼泪！' } },
   corn:       { zh: '玉米',   en: 'corn',       ipa: '/kɔːrn/',      lv: 3, seed: 6,  sell: 6,  grow: 150, yield: 3, xp: 8,  say: { en: 'The corn is tall and sweet.', zh: '玉米又高又甜。' } },
   strawberry: { zh: '草莓',   en: 'strawberry', ipa: '/ˈstrɔːberi/', lv: 4, seed: 8,  sell: 8,  grow: 180, yield: 4, xp: 10, say: { en: 'These strawberries are so sweet.', zh: '这些草莓好甜。' } },
+  bluebell:   { zh: '蓝铃花', en: 'bluebell',   ipa: '/ˈbluːbel/',   lv: 4, seed: 10, sell: 12, grow: 200, yield: 2, xp: 12, art: 'art/crop-bluebell.png', say: { en: 'Listen! The bluebell is singing.', zh: '听！蓝铃花在唱歌。' } },
   pumpkin:    { zh: '南瓜',   en: 'pumpkin',    ipa: '/ˈpʌmpkɪn/',   lv: 5, seed: 12, sell: 16, grow: 240, yield: 2, xp: 14, say: { en: 'What a big pumpkin!', zh: '好大的南瓜！' } },
 };
 const CROP_IDS = Object.keys(CROPS);
+// 带 art 的作物用作者画的图（art/，原图在 art/src/，tools/cut_sprite.py 抠白底、缩到农场原画的比例）：长大和成熟用这张图，种子和小苗用通用的小芽
+const CROP_ART = {}; CROP_IDS.forEach(id => { if (CROPS[id].art) { const i = new Image(); i.src = CROPS[id].art; CROP_ART[id] = i; } });
 const ITEMS = Object.assign({}, CROPS, { egg: { zh: '鸡蛋', en: 'egg', ipa: '/eɡ/', lv: 1, sell: 3 } });
 const RECIPES = [
   { id: 'salad', en: 'Garden Salad', zh: '田园沙拉', lv: 1, price: 20, need: { lettuce: 2, tomato: 1 }, p: 'a garden salad', steps: [
@@ -1067,6 +1072,7 @@ const CONTR = { "it's": 'it is', "i'm": 'i am', "i'd": 'i would', "i'll": 'i wil
 function normWords(s) {
   s = String(s).toLowerCase().replace(/[‘’`]/g, "'").replace(/\b\d+\b/g, m => numWords(+m));
   s = s.replace(/[a-z']+/g, w => CONTR[w] || w).replace(/-/g, ' ').replace(/[^a-z0-9' ]/g, ' ').replace(/'/g, '');
+  s = s.replace(/\bblue bell(s?)\b/g, 'bluebell$1');   // 识别器常把 bluebell 拆成两个词
   return s.split(/\s+/).filter(Boolean);
 }
 const stem = w => w.endsWith('ies') ? w.slice(0, -3) + 'y' : /(s|x|z|ch|sh|o)es$/.test(w) ? w.slice(0, -2) : w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w;
@@ -1484,7 +1490,10 @@ function drawFarm(t) {
     if (!p.crop) { if (Object.values(S.seeds).some(n => n > 0) && (t / 600 | 0) % 2) { R(g, q.x - 1, q.y - 3, 2, 6, PAL.g3); R(g, q.x - 3, q.y - 1, 6, 2, PAL.g3); } continue; }
     const st = stageOf(p), ripe = st === 3, bounce = ripe && Math.sin(t / 260 + k * 1.3) > .85 ? -1 : 0;
     shadowHD(g, q.x + 1, q.y + 2, st >= 2 ? 11 : 5, 2.4, .25);
-    dhk(g, hdCrop(p.crop, st, (blink + k) % 7 === 1 ? 1 : 0), q.x, q.y + 2 + bounce, 15, 32, K_CROP);
+    const art = CROP_ART[p.crop];
+    if (art && st >= 2) {
+      if (art.complete && art.naturalWidth) { const kk = st === 3 ? 1 : .62, w = art.naturalWidth / IMG_PX * kk, hh = art.naturalHeight / IMG_PX * kk; g.imageSmoothingEnabled = true; g.drawImage(art, q.x - w / 2, q.y + 3 - hh + bounce, w, hh); g.imageSmoothingEnabled = false; }
+    } else dhk(g, hdCrop(p.crop, st, (blink + k) % 7 === 1 ? 1 : 0), q.x, q.y + 2 + bounce, 15, 32, K_CROP);
     if (ripe && (t / 900 + k * .37) % 1 < .3) { const sx = q.x - 10 + Math.floor(hash(k + Math.floor(t / 900)) * 20), sy = q.y - 24 - Math.floor(hash(k * 3 + Math.floor(t / 900)) * 8); P(g, sx, sy, PAL.n0); P(g, sx - 1, sy, PAL.y0); P(g, sx + 1, sy, PAL.y0); P(g, sx, sy - 1, PAL.y0); P(g, sx, sy + 1, PAL.y0); }
     for (let b = 0; b < p.bugs; b++) { const a = t / 700 + k + b * 3, bx = Math.round(q.x + Math.cos(a) * 11), by = Math.round(q.y + Math.sin(a) * 4), f = (t / 150 | 0) % 2; R(g, bx - 1, by - 1, 4, 3, C.ink); R(g, bx, by, 2, 1, PAL.r1); P(g, bx + (f ? -2 : 3), by + 1, C.ink); P(g, bx + (f ? 3 : -2), by, C.ink); }
   }
@@ -2135,7 +2144,7 @@ function openSettings() {
 // ================= 版本、更新、存档码 =================
 // 每次发布把 BUILD 加一，同时改 game/version.json。打开游戏时去 GitHub 看最新版本号，有新的就问要不要更新；
 // 进度存在本机浏览器里，更新只换游戏本身，进度、金币、单词成绩都保留。
-const BUILD = 10, BUILD_DATE = '2026-10-31';
+const BUILD = 11, BUILD_DATE = '2026-10-31';
 const REPO = 'a01022971718-cyber/mv', BRANCH = 'ccr-17470247-hlo7zp';
 async function latestBuild() {
   // 先问 GitHub API（没有 CDN 缓存），连不上再试 raw.githubusercontent
