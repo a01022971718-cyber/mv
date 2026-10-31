@@ -245,7 +245,7 @@ canvas.cv{display:block;margin:0 auto;image-rendering:pixelated;image-rendering:
 
   <main id="stage">
     <section id="v-farm" class="view">
-      <div class="scene"><canvas id="farmCv" class="cv" aria-label="农场：点地块播种、照料和收获；点鸡窝捡蛋"></canvas><div id="farmFx" class="fx"></div><div class="ovl"><button class="btn ghost" id="bLabels" type="button" aria-pressed="false"></button></div></div>
+      <div class="scene"><canvas id="farmCv" class="cv" aria-label="农场：点地块播种、照料和收获；点鸡窝捡蛋"></canvas><div id="farmFx" class="fx"></div><div class="ovl"><button class="btn ghost" id="bLabels" type="button" aria-pressed="false" aria-label="显示所有英文标签"></button></div></div>
       <div class="gut stack">
         <div id="farmStatus" class="status" aria-live="polite"></div>
         <div class="tools">
@@ -296,6 +296,7 @@ canvas.cv{display:block;margin:0 auto;image-rendering:pixelated;image-rendering:
 // ================= 主色板与像素绘图工具 =================
 // 40 色主色板：每种材质 3–5 级色阶，暗部偏冷（往紫蓝走）、亮部偏暖（往黄走）。
 // 所有画笔函数都会把颜色吸附到这套色板上，场景、角色、图标、界面因此是同一家人。
+let FREE = false, RAW = false, FACES = [];   // 高清农场用：FREE 不吸附色板，RAW 生成不描边的原始精灵，FACES 记下脸的位置给眼睛加高光
 const PAL = {
   n0: '#fffaf0', n1: '#f4e4c1', n2: '#d8bf94', n3: '#a38b78', n4: '#6b5b6e', n5: '#3d3150', n6: '#241b33', n7: '#150f20',
   g0: '#d4f07a', g1: '#8fd14f', g2: '#4fa83d', g3: '#2e7a3a', g4: '#1d4f3a',
@@ -325,7 +326,7 @@ const SNAP = new Map();
 const hexRGB = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 // 最近色（红均值加权的 RGB 距离，比直接欧氏距离更接近人眼）
 function snap(col) {
-  if (typeof col !== 'string' || col[0] !== '#' || col.length !== 7) return col;
+  if (FREE || typeof col !== 'string' || col[0] !== '#' || col.length !== 7) return col;
   let s = SNAP.get(col); if (s) return s;
   const [r, g, b] = hexRGB(col); let bd = Infinity;
   for (const p of PAL_LIST) { const [R2, G2, B2] = hexRGB(p), rm = (r + R2) / 2, d = (2 + rm / 256) * (r - R2) ** 2 + 4 * (g - G2) ** 2 + (2 + (255 - rm) / 256) * (b - B2) ** 2; if (d < bd) { bd = d; s = p; } }
@@ -370,6 +371,7 @@ function poly(g, pts, col) {
 function mat(g, x, y, rows, map) { rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch !== '.' && map[ch]) P(g, x + i, y + j, map[ch]); })); }
 // 自动描边：透明像素若四邻有实像素 → 墨色
 function outline(c, col = C.ink) {
+  if (RAW) return c;
   const g = c.getContext('2d'), w = c.width, h = c.height, d = g.getImageData(0, 0, w, h).data, a = i => d[i * 4 + 3] > 0, add = [];
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     const i = y * w + x; if (a(i)) continue;
@@ -393,7 +395,7 @@ function box(g, x, y, w, h, col) { R(g, x - 1, y - 1, w + 2, h + 2, C.ink); R(g,
 function shadow(g, cx, cy, rx, ry = 2, a = .28) { g.save(); g.globalAlpha = a; E(g, cx, cy, rx, ry, C.ink); g.restore(); }
 // 精灵缓存：同一个 key 只画一次；sprite() 留 1px 边给描边
 const SPR = new Map();
-function spr(k, fn) { let s = SPR.get(k); if (!s) { s = fn(); SPR.set(k, s); } return s; }
+function spr(k, fn) { if (RAW) k = 'raw:' + k; let s = SPR.get(k); if (!s) { s = fn(); SPR.set(k, s); } return s; }
 function sprite(w, h, draw, ol = true) { const [c, g] = mk(w + 2, h + 2); g.translate(1, 1); draw(g); g.setTransform(1, 0, 0, 1, 0, 0); return ol ? outline(c) : c; }
 // 夜里给角色用的暗一点的版本（只压暗，不染色，避免豆豆变成紫色）
 function dimSpr(c, a, key) { return spr('dim:' + key + ':' + a, () => { const [d, g] = mk(c.width, c.height); g.drawImage(c, 0, 0); g.globalCompositeOperation = 'source-atop'; g.globalAlpha = a; g.fillStyle = PAL.n6; g.fillRect(0, 0, d.width, d.height); return d; }); }
@@ -412,6 +414,7 @@ function fitCanvas(cv, H, minW = 160) {
 //   番茄 red and ripe → 脸红；洋葱 make me cry → 流泪；土豆 dig up → 埋在土里打瞌睡；生菜 fresh and crunchy → 眯眼笑；
 //   胡萝卜 pull up → 张嘴喊；玉米 tall and sweet → 咧嘴；草莓 so sweet → 害羞；南瓜 What a big pumpkin! → 得意大笑。
 function face(g, cx, cy, kind, f) {
+  if (RAW) FACES.push([cx + 1, cy + 1, kind, f]);
   const k = PAL.n7;
   if (kind === 'sleepy' || (f && kind !== 'happy')) { R(g, cx - 3, cy, 2, 1, k); R(g, cx + 2, cy, 2, 1, k); }
   else if (kind === 'happy') { P(g, cx - 3, cy, k); P(g, cx - 2, cy - 1, k); P(g, cx - 1, cy, k); P(g, cx + 1, cy, k); P(g, cx + 2, cy - 1, k); P(g, cx + 3, cy, k); }
@@ -515,18 +518,7 @@ function cropSpr(id, st, f = 0) {
 const deadSpr = () => spr('dead', () => sprite(28, 32, g => { L(g, 13, 31, 10, 20, PAL.w1); L(g, 15, 31, 18, 21, PAL.w2); L(g, 14, 31, 14, 24, PAL.w0); P(g, 9, 19, PAL.w1); P(g, 8, 20, PAL.w0); P(g, 19, 20, PAL.w2); P(g, 19, 22, PAL.w0); }));
 const weedSpr = () => spr('weed', () => sprite(12, 9, g => { L(g, 1, 8, 0, 3, C.leaf); L(g, 3, 8, 3, 1, C.leaf2); L(g, 5, 8, 7, 2, C.leafHi); L(g, 8, 8, 11, 4, C.leaf); P(g, 3, 0, PAL.y1); P(g, 7, 1, PAL.n0); }));
 const lockSpr = () => spr('lock', () => sprite(7, 8, g => { R(g, 1, 0, 5, 1, C.steel2); R(g, 1, 0, 1, 4, C.steel2); R(g, 5, 0, 1, 4, C.steel2); R(g, 0, 3, 7, 5, C.gold); P(g, 3, 5, C.ink); P(g, 3, 6, C.ink); P(g, 1, 4, PAL.y0); }));
-// 地块：44×22 的等距菱形 + 3px 厚的边
 const TILE = { hw: 22, hh: 11 };
-function soilSpr(kind) {
-  return spr('soil:' + kind, () => {
-    const [c, g] = mk(48, 30), cx = 24, cy = 12, hh = TILE.hh;
-    const top = { dry: C.soil, wet: C.wet, lock: C.grass2 }[kind], top2 = { dry: C.soil2, wet: C.wet2, lock: C.grass }[kind], side = { dry: C.soilEdge, wet: PAL.n6, lock: C.grassDk }[kind];
-    const row = (r, oy, pick) => { const d = r < hh ? hh - 1 - r : r - hh, hw = (hh - d) * 2, y = cy - hh + r; for (let x = cx - hw; x < cx + hw; x++) P(g, x, y + oy, pick(x, y)); };
-    for (let r = 0; r < 2 * hh; r++) row(r, 3, () => side);
-    for (let r = 0; r < 2 * hh; r++) row(r, 0, (x, y) => kind === 'lock' ? ((x + y * 3) % 5 === 0 ? top2 : top) : (((x - cx) + 2 * (y - cy) + 600) % 6 < 2 ? top2 : top));
-    return outline(c);
-  });
-}
 
 // ================= 角色与场景道具 =================
 // 豆豆：一块小豆腐（奶白、两条短腿、圆点眼 + 腮红、头顶一小撮葱），厨房里戴厨师帽
@@ -554,10 +546,6 @@ function henSpr(f) {
     if (f) { P(g, 5, 9, C.gold); P(g, 5, 10, C.gold); P(g, 6, 9, C.gold); P(g, 6, 10, C.gold); } else { P(g, 4, 9, C.gold); P(g, 4, 10, C.gold); P(g, 7, 9, C.gold); P(g, 7, 10, C.gold); }
   }));
 }
-const treeSpr = () => spr('tree', () => sprite(22, 28, g => { R(g, 9, 16, 4, 12, C.wood2); R(g, 10, 16, 1, 12, C.wood); E(g, 11, 10, 10, 9, C.leaf2); E(g, 10, 8, 8, 7, C.leaf); E(g, 8, 6, 4, 3, C.leafHi); P(g, 15, 11, C.tomato); P(g, 6, 12, C.tomato); P(g, 12, 5, C.tomato); }));
-const bushSpr = () => spr('bush', () => sprite(16, 10, g => { E(g, 8, 6, 8, 4.5, C.leaf2); E(g, 6, 5, 5, 3.4, C.leaf); E(g, 5, 4, 2, 1.4, C.leafHi); P(g, 11, 4, '#f48ab8'); P(g, 3, 7, '#ffffff'); }));
-const cloudSpr = () => spr('cloud', () => sprite(22, 8, g => { E(g, 7, 5, 6, 3, '#ffffff'); E(g, 13, 4, 6, 3.6, '#ffffff'); E(g, 17, 5.5, 4, 2.4, '#ffffff'); R(g, 3, 6, 18, 2, '#e8f2ff'); }, false));
-const eggSmall = () => spr('eggS', () => sprite(4, 5, g => { E(g, 2, 2.5, 2, 2.5, C.egg); P(g, 1, 1, '#ffffff'); }));
 
 // 客人：五只原创小动物（半身像 20×22）
 const CRITTERS = {
@@ -752,7 +740,7 @@ const QDEF = {
   cook: { zh: '做菜', g: [1, 2] }, serve: { zh: '接待客人', g: [2, 3] }, star3: { zh: '口语拿到三星', g: [3, 5] }, speak: { zh: '开口说英语', g: [8, 12] },
 };
 // 地块：3×3 斜 45° 菱形，(i,j) → 屏幕中心
-const PLOTS = Array.from({ length: 9 }, (_, k) => { const i = Math.floor(k / 3), j = k % 3; return { i, j, x: 90 + (i - j) * 22, y: 88 + (i + j) * 11 }; });
+const PLOTS = Array.from({ length: 9 }, (_, k) => { const i = Math.floor(k / 3), j = k % 3; return { i, j, x: 68 + (i - j) * 22, y: 82 + (i + j) * 11 }; });
 const PLOT_ORDER = [...PLOTS.keys()].sort((a, b) => PLOTS[a].y - PLOTS[b].y || PLOTS[a].x - PLOTS[b].x);
 
 // ================= 存档 =================
@@ -1215,17 +1203,16 @@ function speakCard(item, { onResult } = {}) {
 // 透视统一用 2:1 等距：世界坐标 (x, y, z) → 屏幕 (x − y)·2, (x + y) − z。一块地是 44×22 的菱形。
 // 比例以豆豆为准：豆豆连葱约 19px 高，房门 16px，鸡舍门 9px。光从左上来，投影落在右下。
 // 层次（参考精致农场游戏的丰富度，用自己的像素风和原创地标）：远山 → 树林 → 房子、鸡舍 → 菜地 → 栅栏 → 小路 → 前景花草。
-const FARM = { w: 180, h: 188, ox: 0, labels: false };
+const FARM = { w: 180, h: 200, ox: 0, labels: false };
 const DD = { t: .5, tt: .5, face: 1, hop: 0, next: 0 };
-const HEN = { x: 164, dir: -1, wait: 0 };
-const PATH = [[0, 139], [90, 184], [180, 139]];  // 沿菜地前面两条边的 V 形小路
+const HEN = { x: 46, dir: -1, wait: 0 };
 const PT = [];
 let farmCv, FG, sel = -1, selT = 0, TAPLBL = null, CHAT = null, chatNext = 0;
 function todPhase(d = new Date()) { const h = d.getHours() + d.getMinutes() / 60; return h < 5 || h >= 20 ? 'night' : h < 7 ? 'dawn' : h < 17 ? 'day' : 'dusk'; }
 const SKY = { day: [PAL.s2, PAL.s1, PAL.s0], dawn: [PAL.s3, PAL.p0, PAL.y0], dusk: [PAL.p2, PAL.r0, PAL.y2], night: [PAL.n7, PAL.n6, PAL.s5] };
 const NIGHT_TINT = { night: 'rgba(34,48,106,.5)', dusk: 'rgba(122,58,138,.22)', dawn: 'rgba(58,127,208,.16)' };
-const pathAt = t => { const [a, b] = t < .5 ? [PATH[0], PATH[1]] : [PATH[1], PATH[2]], f = t < .5 ? t * 2 : t * 2 - 1; return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]; };
-const pathT = x => Math.max(.04, Math.min(.96, x / 180));
+const pathAt = t => [56 + t * 90, 176 + Math.sin(t * Math.PI * 2) * 3];   // 豆豆在下面的空地上走来走去
+const pathT = x => Math.max(.04, Math.min(.96, (x - 56) / 90));
 
 // ---- 像素小字体（3×5，大写），给场景名牌、木牌、地图用 ----
 const GLYPH = {
@@ -1243,56 +1230,8 @@ function drawText(g, x, y, s, col) { let cx = x; for (const ch of s.toUpperCase(
 const labelSpr = (text, speech) => spr(`lbl:${text}:${speech ? 1 : 0}`, () => { const w = textW(text) + 4; return sprite(w, speech ? 10 : 9, g => { R(g, 0, 0, w, 9, PAL.n0); drawText(g, 2, 2, text, PAL.n7); if (speech) { P(g, Math.floor(w / 2) - 1, 9, PAL.n0); P(g, Math.floor(w / 2), 9, PAL.n0); } }); });
 function drawLabel(g, text, cx, by, speech) { const s = labelSpr(text, speech); g.drawImage(s, Math.round(cx - s.width / 2), Math.round(by - s.height)); }
 
-// ---- 等距建筑 ----
+// ---- 等距投影：x 往右下、y 往左下、z 往上 ----
 function isoS(sx, sy) { return (x, y, z) => [sx + (x - y) * 2, sy + (x + y) - z]; }
-function isoBox(g, S, a, b, h, rh, col) {
-  const o = 1.2, m = b / 2, z1 = h, z2 = h + rh;
-  poly(g, [S(0, b, 0), S(a, b, 0), S(a, b, h), S(0, b, h)], col.wl);      // 朝左下的墙：受光
-  poly(g, [S(a, b, 0), S(a, 0, 0), S(a, 0, h), S(a, b, h)], col.wd);      // 朝右下的墙：背光
-  poly(g, [S(a, b, h), S(a, 0, h), S(a, m, z2)], col.wd);                   // 山墙
-  poly(g, [S(-o, m, z2), S(a + o, m, z2), S(a + o, -o, z1), S(-o, -o, z1)], col.roof2);
-  poly(g, [S(-o, b + o, z1), S(a + o, b + o, z1), S(a + o, m, z2), S(-o, m, z2)], col.roof);
-  for (let k = 1; k < 4; k++) { const f = k / 4, zz = z1 + (z2 - z1) * f, yy = b + o - (b + o - m) * f; L(g, ...S(-o, yy, zz), ...S(a + o, yy, zz), col.roof2); }
-  L(g, ...S(-o, m, z2), ...S(a + o, m, z2), col.ridge || col.roof2);
-}
-const quad = (S, pts) => pts.map(p => S(...p));
-const HOUSE = { sx: 36, sy: 54, a: 14, b: 12, h: 24, rh: 14 };
-const COOP = { sx: 152, sy: 50, a: 9, b: 8, h: 13, rh: 8 };
-const houseSpr = () => spr('house', () => sprite(60, 64, g => {
-  const { a, b, h, rh } = HOUSE, S = isoS(27, 34);
-  isoBox(g, S, a, b, h, rh, { wl: PAL.n1, wd: PAL.n2, roof: PAL.r1, roof2: PAL.r2, ridge: PAL.r3 });
-  for (let x = 1.5; x < a; x += 2.5) L(g, ...S(x, b, 1), ...S(x, b, h - 1), PAL.n2);
-  for (let y = 1.5; y < b; y += 2.5) L(g, ...S(a, y, 1), ...S(a, y, h - 1), PAL.n3);
-  poly(g, quad(S, [[7.5, b, 0], [11.5, b, 0], [11.5, b, 16], [7.5, b, 16]]), PAL.w2);      // 门（16px，和豆豆差不多高）
-  poly(g, quad(S, [[8.2, b, 0], [10.8, b, 0], [10.8, b, 14.5], [8.2, b, 14.5]]), PAL.w1);
-  P(g, ...S(10.3, b, 7), PAL.y2);
-  poly(g, quad(S, [[1.5, b, 9], [5, b, 9], [5, b, 17], [1.5, b, 17]]), PAL.s1);
-  L(g, ...S(3.2, b, 9), ...S(3.2, b, 17), PAL.w2); L(g, ...S(1.5, b, 13), ...S(5, b, 13), PAL.w2);
-  poly(g, quad(S, [[a, 4, 10], [a, 8, 10], [a, 8, 17], [a, 4, 17]]), PAL.s2);
-  L(g, ...S(a, 6, 10), ...S(a, 6, 17), PAL.w3);
-  poly(g, quad(S, [[1, b, 7], [5.5, b, 7], [5.5, b, 8.5], [1, b, 8.5]]), PAL.w2);
-  P(g, ...S(2, b, 9.5), PAL.r1); P(g, ...S(3.5, b, 9.5), PAL.y1); P(g, ...S(5, b, 9.5), PAL.p0);
-  const cx = 10, cy = 3;
-  poly(g, quad(S, [[cx, cy + 2, h + 7], [cx + 2, cy + 2, h + 7], [cx + 2, cy + 2, h + 16], [cx, cy + 2, h + 16]]), PAL.w2);
-  poly(g, quad(S, [[cx + 2, cy + 2, h + 7], [cx + 2, cy, h + 7], [cx + 2, cy, h + 16], [cx + 2, cy + 2, h + 16]]), PAL.w3);
-  poly(g, quad(S, [[cx, cy, h + 16], [cx + 2, cy, h + 16], [cx + 2, cy + 2, h + 16], [cx, cy + 2, h + 16]]), PAL.n5);
-}));
-const HOUSE_WIN = () => { const S = isoS(HOUSE.sx, HOUSE.sy), b = HOUSE.b, a = HOUSE.a; return [quad(S, [[1.5, b, 9], [5, b, 9], [5, b, 17], [1.5, b, 17]]), quad(S, [[a, 4, 10], [a, 8, 10], [a, 8, 17], [a, 4, 17]])]; };
-const coopSpr = () => spr('coop', () => sprite(42, 40, g => {
-  const { a, b, h, rh } = COOP, S = isoS(19, 19);
-  isoBox(g, S, a, b, h, rh, { wl: PAL.w1, wd: PAL.w2, roof: PAL.r2, roof2: PAL.r3 });
-  for (let x = 1.5; x < a; x += 2) L(g, ...S(x, b, 1), ...S(x, b, h - 1), PAL.w2);
-  poly(g, quad(S, [[3, b, 0], [5.5, b, 0], [5.5, b, 9], [3, b, 9]]), PAL.n6);
-  L(g, ...S(3, b, 4), ...S(1.5, b, 0), PAL.w0);
-}));
-function isoShadow(g, S, a, b) { g.save(); g.globalAlpha = .22; poly(g, quad(S, [[0, 0, 0], [a + 2, 0, 0], [a + 2, b + 2, 0], [0, b + 2, 0]]).map(([x, y]) => [x + 3, y + 1]), C.ink); g.restore(); }
-const fenceSpr = () => spr('fence', () => sprite(140, 46, g => {
-  const seg = (x0, y0, x1, y1) => {
-    L(g, x0, y0 - 3, x1, y1 - 3, PAL.w0); L(g, x0, y0 - 7, x1, y1 - 7, PAL.w0);
-    const n = Math.round(Math.abs(x1 - x0) / 11); for (let k = 0; k <= n; k++) { const x = x0 + (x1 - x0) * k / n, y = y0 + (y1 - y0) * k / n; R(g, x, y - 9, 2, 9, PAL.w1); P(g, x, y - 9, PAL.w0); }
-  };
-  seg(2, 11, 70, 45); seg(70, 45, 138, 11);
-}));
 // 豆腐稻草人：农场的地标，豆腐脑袋戴草帽
 const scarecrowSpr = () => spr('scarecrow', () => sprite(20, 34, g => {
   R(g, 9, 12, 2, 22, PAL.w2); R(g, 2, 15, 16, 2, PAL.w2);
@@ -1303,15 +1242,6 @@ const scarecrowSpr = () => spr('scarecrow', () => sprite(20, 34, g => {
   P(g, 8, 13, PAL.n7); P(g, 9, 14, PAL.n7); P(g, 10, 13, PAL.n7);
   R(g, 1, 4, 18, 2, PAL.y2); R(g, 5, 0, 10, 4, PAL.y2); R(g, 5, 3, 10, 1, PAL.r1); P(g, 6, 1, PAL.y1); P(g, 9, 1, PAL.y1);
 }));
-const signSpr = () => spr('sign', () => sprite(30, 20, g => {
-  R(g, 3, 12, 2, 8, PAL.w2); R(g, 25, 12, 2, 8, PAL.w2);
-  R(g, 0, 0, 30, 14, PAL.w0); R(g, 0, 13, 30, 1, PAL.w1);
-  drawText(g, Math.round((30 - textW('DOUDOU')) / 2), 2, 'DOUDOU', PAL.w3); drawText(g, Math.round((30 - textW('FARM')) / 2), 8, 'FARM', PAL.r2);
-}));
-const mailboxSpr = () => spr('mailbox', () => sprite(12, 16, g => { R(g, 5, 7, 2, 9, PAL.w2); R(g, 0, 1, 10, 7, PAL.r1); R(g, 1, 0, 8, 1, PAL.r1); R(g, 0, 6, 10, 1, PAL.r2); R(g, 2, 3, 5, 1, PAL.n7); R(g, 10, 0, 1, 5, PAL.w2); R(g, 10, 0, 2, 2, PAL.y2); }));
-const haySpr = () => spr('hay', () => sprite(18, 14, g => { E(g, 9, 9, 9, 5, PAL.y2); E(g, 9, 7, 7, 4.5, PAL.y1); E(g, 8, 5, 4, 2.5, PAL.y0); for (let x = 3; x < 16; x += 3) L(g, x, 6, x - 1, 12, PAL.y2); P(g, 4, 2, PAL.y1); P(g, 14, 3, PAL.y1); }));
-const mushSpr = () => spr('mush', () => sprite(8, 8, g => { E(g, 4, 3, 4, 2.6, PAL.r1); P(g, 2, 2, PAL.n0); P(g, 5, 1, PAL.n0); P(g, 6, 3, PAL.n0); R(g, 3, 5, 2, 3, PAL.n1); }));
-const flowerPatch = (g, x, y, n, seed) => { for (let i = 0; i < n; i++) { const fx = x + Math.floor(hash(seed + i) * 18), fy = y + Math.floor(hash(seed + i * 3.3) * 8); P(g, fx, fy + 1, C.grassDk); P(g, fx, fy, [PAL.n0, PAL.y1, PAL.p0, PAL.r0][i % 4]); } };
 
 // ---- 场景里可以点的东西：点一下弹英文名牌并读出来（点哪儿学哪儿） ----
 const WORLD = [
@@ -1322,11 +1252,12 @@ const WORLD = [
 ];
 // 热区：设计坐标里的矩形；lx/ly 是名牌的位置（名牌底边中点）
 const SPOTS = [
-  { w: 'house', r: [10, 22, 54, 58], lx: 37, ly: 22 }, { w: 'hen house', r: [134, 32, 38, 35], lx: 153, ly: 32 },
-  { w: 'scarecrow', r: [4, 78, 20, 34], lx: 14, ly: 123 }, { w: 'mailbox', r: [44, 124, 14, 18], lx: 51, ly: 153 },
-  { w: 'farm', r: [4, 160, 30, 20], lx: 19, ly: 160 }, { w: 'hay', r: [143, 160, 20, 16], lx: 153, ly: 160 },
-  { w: 'tree', r: [162, 146, 26, 36], lx: 175, ly: 146 }, { w: 'mushroom', r: [150, 176, 12, 10], lx: 156, ly: 176 },
-  { w: 'flowers', r: [62, 170, 22, 12], lx: 73, ly: 170 }, { w: 'mountain', r: [0, 12, 180, 22], lx: 120, ly: 22, noLabel: true },
+  { w: 'house', r: [124, 26, 56, 62], lx: 150, ly: 26 }, { w: 'hen house', r: [4, 30, 38, 36], lx: 62, ly: 33 },
+  { w: 'scarecrow', r: [3, 111, 22, 36], lx: 24, ly: 150 }, { w: 'mailbox', r: [152, 95, 13, 20], lx: 158, ly: 94 },
+  { w: 'farm', r: [5, 159, 33, 22], lx: 50, ly: 167 }, { w: 'hay', r: [149, 122, 22, 20], lx: 156, ly: 121 },
+  { w: 'mushroom', r: [166, 147, 12, 8], lx: 172, ly: 147 }, { w: 'tree', r: [161, 114, 28, 34], lx: 175, ly: 113 },
+  { w: 'flowers', r: [42, 179, 16, 20], lx: 50, ly: 179 }, { w: 'flowers', r: [171, 92, 15, 27], lx: 178, ly: 91, noLabel: true },
+  { w: 'mountain', r: [0, 14, 130, 26], lx: 60, ly: 30, noLabel: true },
 ];
 function showWord(w, x, y) { TAPLBL = { w, x, y, t0: performance.now() }; say(w); }
 
@@ -1360,110 +1291,531 @@ function plotNeed(p) {
 }
 const NEED_ZH = { ripe: '可收', bug: '有虫', weed: '有草', dry: '缺水', dead: '枯苗', empty: '空地' };
 
-// ---- 背景：天空、远山、树林、草地、小路、房子、鸡舍、前景道具；按宽度和时段缓存 ----
-function farmBg(ph, W) {
-  return spr(`fbg:${ph}:${W}`, () => {
-    const [c, g] = mk(W, FARM.h), ox = FARM.ox;
-    skyFill(g, 0, 0, W, 46, SKY[ph]);
-    if (ph === 'night') for (let i = 0; i < 40; i++) P(g, Math.floor(hash(i) * W), Math.floor(hash(i + 50) * 28), i % 3 ? PAL.s1 : PAL.n0);
-    for (let x = 0; x < W; x++) {   // 远山两层，近一点的山尖有雪
-      const u = x - ox, m1 = Math.round(26 - Math.abs(Math.sin(u * .035 + .6)) * 12 - Math.sin(u * .11) * 2);
-      R(g, x, m1, 1, 46 - m1, PAL.s3); if (m1 < 18) R(g, x, m1, 1, 2, PAL.s0);
-      const m2 = Math.round(34 - Math.abs(Math.sin(u * .05 + 2)) * 8); R(g, x, m2, 1, 46 - m2, PAL.s4);
+// ================= 高清像素（农场）：工具 =================
+// 农场画布 1 个美术像素 = 1 个 CSS 像素（其他页面仍是 2 个）。逻辑坐标照旧（180 宽），绘制时整体放大 2 倍：
+// 背景、房子、豆豆、地块在高清画布上原生绘制；作物等旧精灵用 Scale2x 放大，再重新上彩色描边和受光/背光。
+const HP = {   // 高清扩展色阶：每种材质 5–7 级，暗部偏冷偏紫，亮部偏暖
+  sky: { day: ['#2f8fe6', '#47aef2', '#79cdfa', '#b5e7ff'], dawn: ['#5d7fd6', '#a98fd0', '#f7a8b0', '#ffd9a0'], dusk: ['#4c3b8f', '#9a4f9c', '#ef7d7a', '#ffc070'], night: ['#151a40', '#1f2a5c', '#2b3b76', '#3a4f8c'] },
+  sea: ['#eafcff', '#a6ecff', '#5fd0f6', '#33afe6', '#2490d4', '#1d6fb5'],
+  mtnFar: ['#d7eef3', '#b9dfe8', '#94c6d8'], mtn: ['#d3efdc', '#a6dab4', '#84c39e', '#5fa489', '#478877'],
+  g: ['#d6f27a', '#aee35a', '#8cd248', '#6dbd3e', '#52a237', '#3d8532', '#2b652c', '#1d4724'],
+  leaf: ['#b8ea64', '#82cc4c', '#55ad42', '#3b8e3c', '#2a6e36', '#1d522e', '#12361f'],
+  sand: ['#fff1c6', '#f8e0a4', '#efcb84', '#e0b066', '#c8914e', '#a3703c', '#74502e'],
+  stone: ['#fbf4e6', '#e9dcc4', '#d2c0a2', '#b29e82', '#8a7864', '#5f5148'],
+  wood: ['#f7cd8a', '#e2a660', '#c7813f', '#a1602f', '#7a4425', '#542c1c', '#36190f'],
+  straw: ['#fff4b0', '#ffe07a', '#f6c24e', '#e09d32', '#bb7624', '#8c541a'],
+  soil: ['#b47a4e', '#94603c', '#774a2e', '#5c3622', '#432519', '#2c1811'],
+  wet: ['#8a5a3c', '#6f452d', '#573421', '#412518', '#2e1810', '#1d0f0a'],
+  cream: ['#fffcf3', '#fbf0d8', '#efdcb8', '#dcc196', '#bb9a72', '#8d6e55'],
+  red: ['#ff9a86', '#f2584a', '#d63a3e', '#a82633', '#741a2c'],
+  roof: ['#ffe08a', '#f7bf52', '#e49a36', '#c2782a', '#93561f', '#663a17'],
+  blue: ['#c7d6ff', '#93acff', '#6584f2', '#4660d0', '#3446a0'],
+  pink: ['#ffe0ec', '#ffb3cf', '#f783ad', '#d95a8c'],
+  ink: '#2a1a1e',
+};
+const RGBC = new Map();
+const rgb = h => { let v = RGBC.get(h); if (!v) { v = hexRGB(h); RGBC.set(h, v); } return v; };
+const toHex = ([r, g, b]) => '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('');
+// 在 FREE 模式下画（不吸附色板）
+function free(fn) { const o = FREE; FREE = true; try { return fn(); } finally { FREE = o; } }
+function hdCanvas(w, h, fn) { const [c, g] = mk(w, h); free(() => fn(g, c)); return c; }
+// 彩色描边：透明像素挨着实像素 → 取邻居里最暗的颜色再压暗（叶子描深绿、木头描深棕），太亮的往下压
+function olColor([r, g, b]) { let o = [r * .42, g * .36, b * .42 + 6]; const l = .3 * o[0] + .59 * o[1] + .11 * o[2]; if (l > 62) o = o.map(v => v * 62 / l); return o; }
+function hdOutline(c, diag = false) {
+  const g = c.getContext('2d'), w = c.width, h = c.height, im = g.getImageData(0, 0, w, h), d = im.data, src = new Uint8ClampedArray(d);
+  const A = i => src[i * 4 + 3] > 0, lum = i => src[i * 4] * .3 + src[i * 4 + 1] * .59 + src[i * 4 + 2] * .11;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = y * w + x; if (A(i)) continue;
+    let best = -1;
+    const nb = diag ? [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]] : [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (const [dx, dy] of nb) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (A(j) && (best < 0 || lum(j) < lum(best))) best = j; }
+    if (best >= 0) { const o = olColor([src[best * 4], src[best * 4 + 1], src[best * 4 + 2]]); d[i * 4] = o[0]; d[i * 4 + 1] = o[1]; d[i * 4 + 2] = o[2]; d[i * 4 + 3] = 255; }
+  }
+  g.putImageData(im, 0, 0); return c;
+}
+// 受光 / 背光：光从左上来。上沿、左沿提亮偏暖；下沿、右沿压暗偏冷，再往里一圈轻压，形体就鼓起来了
+function hdLight(c, k = 1) {
+  const g = c.getContext('2d'), w = c.width, h = c.height, im = g.getImageData(0, 0, w, h), d = im.data, src = new Uint8ClampedArray(d);
+  const A = (x, y) => x >= 0 && y >= 0 && x < w && y < h && src[(y * w + x) * 4 + 3] > 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!A(x, y)) continue;
+    const i = (y * w + x) * 4; let t = 0;
+    if (!A(x, y - 1) || !A(x - 1, y)) t = .22; else if (!A(x, y + 1) || !A(x + 1, y)) t = -.24; else if (!A(x, y + 2) || !A(x + 2, y) || !A(x + 1, y + 1)) t = -.1;
+    t *= k; if (!t) continue;
+    if (t > 0) { d[i] += (255 - d[i]) * t; d[i + 1] += (250 - d[i + 1]) * t * .9; d[i + 2] += (210 - d[i + 2]) * t * .6; }
+    else { const s = 1 + t; d[i] *= s * .97; d[i + 1] *= s * .95; d[i + 2] = d[i + 2] * s + 10 * -t; }
+  }
+  g.putImageData(im, 0, 0); return c;
+}
+// Scale2x（EPX）：放大 2 倍时把斜边的台阶补圆，不糊
+function scale2x(src) {
+  const w = src.width, h = src.height, a = new Uint32Array(src.getContext('2d').getImageData(0, 0, w, h).data.buffer.slice(0));
+  for (let i = 0; i < a.length; i++) if ((a[i] >>> 24) === 0) a[i] = 0;
+  const [c, g] = mk(w * 2, h * 2), o = g.createImageData(w * 2, h * 2), b = new Uint32Array(o.data.buffer), W2 = w * 2;
+  const at = (x, y) => x < 0 || y < 0 || x >= w || y >= h ? 0 : a[y * w + x];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const p = at(x, y), A = at(x, y - 1), B = at(x + 1, y), C2 = at(x - 1, y), D = at(x, y + 1);
+    b[2 * y * W2 + 2 * x] = C2 === A && C2 !== D && A !== B ? A : p;
+    b[2 * y * W2 + 2 * x + 1] = A === B && A !== C2 && B !== D ? B : p;
+    b[(2 * y + 1) * W2 + 2 * x] = D === C2 && D !== B && C2 !== A ? C2 : p;
+    b[(2 * y + 1) * W2 + 2 * x + 1] = B === D && B !== A && D !== C2 ? D : p;
+  }
+  g.putImageData(o, 0, 0); return c;
+}
+// 旧精灵 → 高清：不描边地重画一遍 → Scale2x → 眼睛加高光 → 受光背光 → 彩色描边。锚点和旧精灵一致（逻辑坐标照用）
+function hdUp(key, make, opt = {}) {
+  return spr('hd:' + key, () => {
+    RAW = true; FACES = []; let c; try { c = make(); } finally { RAW = false; }
+    c = scale2x(c);
+    const g = c.getContext('2d');
+    FACES.forEach(([cx, cy, kind, f]) => { if (kind === 'sleepy' || kind === 'happy' || f) return; free(() => { [cx - 3, cx + 2].forEach(ex => { P(g, ex * 2, cy * 2 - 2, '#ffffff'); }); }); });
+    if (opt.light !== 0) hdLight(c, opt.light || 1);
+    return hdOutline(c);
+  });
+}
+// 在高清坐标里画（逻辑坐标 ×2，默认已含 ox；传 ox=0 就是画布坐标），给阴影、太阳这类要细边的东西用
+function hiRes(g, fn, ox = FARM.ox) { g.save(); g.setTransform(1, 0, 0, 1, ox * 2, 0); free(() => fn(g)); g.restore(); }
+const dh = (g, c, x, y) => g.drawImage(c, x, y, c.width / 2, c.height / 2);
+function shadowHD(g, cx, cy, rx, ry = 2, a = .26) { hiRes(g, g => { g.globalAlpha = a; E(g, cx * 2, cy * 2, rx * 2, ry * 2, '#2a2236'); }); }
+// ================= 高清精灵：豆豆、地块、云、鸡窝 =================
+// 豆豆（高清）：画布 40×52，和旧精灵（18×24 + 1px 边）同一个锚点
+function ddHD(f) {
+  return spr('hd:dd:' + f, () => {
+    const c = hdCanvas(40, 52, g => {
+      const b = f ? 2 : 0, X = 8, Y = 20 - b, cr = HP.cream;
+      R(g, 12, Y + 21, 5, 49 - Y - 21, cr[3]); R(g, 12, 47, 5, 2, cr[4]); R(g, 23, Y + 21, 5, 47 - Y - 21 + (f ? 0 : 2), cr[3]); R(g, 23, f ? 45 : 47, 5, 2, cr[4]);   // 腿（走路时右腿抬起）
+      R(g, 3, 27 - b + (f ? 2 : 0), 5, 6, cr[2]); R(g, 32, 27 - b - (f ? 2 : 0), 5, 6, cr[3]);   // 手
+      R(g, X + 1, Y, 22, 22, cr[1]); R(g, X, Y + 1, 24, 20, cr[1]);   // 身体（圆角）
+      for (let y = 0; y < 22; y++) R(g, X + 1, Y + y, 22, 1, y < 4 ? cr[0] : y > 16 ? cr[2] : cr[1]);
+      R(g, X, Y + 4, 1, 14, cr[1]); R(g, X + 23, Y + 4, 1, 14, cr[3]);
+      R(g, X + 17, Y + 1, 6, 21, cr[3]); R(g, X + 17, Y, 6, 4, cr[2]); R(g, X + 17, Y + 17, 6, 5, cr[4]);   // 右侧面背光
+      R(g, X + 2, Y + 4, 15, 1, cr[2]);   // 顶面和正面的交界
+      P(g, X + 5, Y + 14, cr[2]); P(g, X + 12, Y + 17, cr[2]); P(g, X + 9, Y + 8, cr[2]);   // 豆腐小气孔
+      const ey = Y + 9; [X + 5, X + 13].forEach(ex => { R(g, ex, ey, 3, 4, HP.ink); P(g, ex, ey, '#ffffff'); });   // 眼睛 + 高光
+      E(g, X + 3.5, Y + 15, 2.5, 1.4, HP.pink[2]); E(g, X + 18, Y + 15, 2.5, 1.4, HP.pink[2]);
+      P(g, X + 9, Y + 15, '#8a2e3a'); R(g, X + 10, Y + 16, 2, 1, '#8a2e3a'); P(g, X + 12, Y + 15, '#8a2e3a');   // 小嘴
+      const sx = 19, sy = Y;   // 头顶一小撮葱
+      R(g, sx, sy - 7, 2, 7, HP.leaf[3]); R(g, sx, sy - 7, 1, 7, HP.leaf[2]);
+      E(g, sx - 4, sy - 9, 4.5, 2.2, HP.leaf[1]); E(g, sx - 5, sy - 10, 2.5, 1, HP.leaf[0]);
+      E(g, sx + 5, sy - 11, 4.5, 2.2, HP.leaf[2]); E(g, sx + 4, sy - 12, 2.5, 1, HP.leaf[1]);
+    });
+    hdLight(c, .45); return hdOutline(c);
+  });
+}
+// 地块（高清）：88×44 的菱形 + 6px 厚的边；翻过的土有垄沟，没开的地是一块草皮
+function soilHD(kind) {
+  return spr('hd:soil:' + kind, () => {
+    const c = hdCanvas(96, 60, g => {
+      const cx = 48, cy = 24, hw = 44, hh = 22, ramp = kind === 'wet' ? HP.wet : HP.soil, lock = kind === 'lock';
+      const inD = (x, y, oy = 0) => Math.abs(x + .5 - cx) / hw + Math.abs(y + .5 - cy - oy) / hh <= 1;
+      for (let y = 0; y < 60; y++) for (let x = 0; x < 96; x++) {
+        if (inD(x, y)) {
+          const u = (x - cx) / 2 + (y - cy), v = (x - cx) / 2 - (y - cy), n = hash(x * 7.1 + y * 13.3);
+          let col;
+          if (lock) { col = HP.g[2]; if (n > .86) col = HP.g[1]; else if (n < .1) col = HP.g[3]; if (((Math.round(v) % 10) + 10) % 10 === 0 && n > .4) col = HP.g[3]; }
+          else { const m = ((Math.round(u) % 9) + 9) % 9; col = m < 2 ? ramp[0] : m < 4 ? ramp[1] : m < 7 ? ramp[2] : ramp[3]; if (n > .93) col = ramp[0]; else if (n < .05) col = ramp[4]; }
+          // 菱形左上两条边提亮，右下两条边压暗
+          const ex = Math.abs(x + .5 - cx) / hw + Math.abs(y + .5 - cy) / hh;
+          if (ex > .93) col = (y < cy) ? (lock ? HP.g[1] : ramp[0]) : (lock ? HP.g[4] : ramp[3]);
+          P(g, x, y, col);
+        } else if (y > cy && inD(x, y, 6) && Math.abs(x + .5 - cx) / hw + Math.abs(y + .5 - cy - 6) / hh <= 1) {
+          const dpt = y - (cy + hh * (1 - Math.abs(x + .5 - cx) / hw));   // 边的厚度方向
+          P(g, x, y, lock ? (dpt < 2 ? HP.soil[1] : HP.soil[3]) : (x < cx ? ramp[3] : ramp[4]));
+        }
+      }
+      if (lock) for (let i = 0; i < 18; i++) { const a = hash(i * 3.7) * 2 - 1, b = hash(i * 5.3) * 2 - 1; if (Math.abs(a) + Math.abs(b) > .8) continue; const x = cx + a * hw, y = cy + b * hh; P(g, x, y, HP.g[0]); P(g, x - 1, y + 1, HP.g[4]); P(g, x + 1, y + 1, HP.g[4]); }
+    });
+    return hdOutline(c);
+  });
+}
+// 云（高清）：一团一团的，底部压一点蓝灰
+const cloudHD = n => spr('hd:cloud:' + n, () => {
+  const w = [60, 44, 52][n], c = hdCanvas(w + 4, 24, g => {
+    const puffs = [[[12, 15, 9], [24, 10, 11], [38, 12, 9], [48, 16, 7], [30, 17, 10]], [[10, 15, 8], [22, 11, 10], [34, 15, 8]], [[12, 15, 8], [24, 10, 9], [36, 12, 8], [44, 16, 6]]][n];
+    puffs.forEach(([x, y, r]) => E(g, x + 2, y, r, r * .8, '#ffffff'));
+    g.globalCompositeOperation = 'source-atop';
+    R(g, 0, 17, w + 4, 8, '#dcecfb'); puffs.forEach(([x, y, r]) => E(g, x + 1, y - 3, r * .5, r * .3, '#ffffff'));
+    g.globalCompositeOperation = 'source-over';
+  });
+  return c;
+});
+const eggHD = () => spr('hd:egg', () => { const c = hdCanvas(10, 12, g => { E(g, 5, 6.5, 4, 5, '#fff3dc'); E(g, 6, 8, 2.5, 3, '#ecd6b2'); P(g, 3, 4, '#ffffff'); }); return hdOutline(c); });
+const nestHD = () => spr('hd:nest', () => { const c = hdCanvas(34, 14, g => { E(g, 17, 8, 16, 5, HP.straw[4]); E(g, 17, 7, 14, 4, HP.straw[2]); E(g, 17, 6, 10, 2.4, HP.straw[4]); for (let x = 3; x < 31; x += 3) { P(g, x, 9 + (x % 2), HP.straw[1]); P(g, x + 1, 5 + (x % 3 ? 0 : 1), HP.straw[0]); } }); return hdOutline(c); });
+// ================= 高清农场场景 =================
+// 构图：左边菜地，远处是海和山；右边是房子，石板路从门口通到下面的空地；鸡舍在左上；四角用树丛框住。
+// 坐标：高清设计坐标 360×400（= 逻辑坐标 ×2）；屏幕比 360 宽时，多出来的部分由背景向两边延伸填满。
+const HOUSEHD = { sx: 300, sy: 121, a: 28, b: 24, h: 48, rh: 28 };
+const COOPHD = { sx: 46, sy: 98, a: 18, b: 14, h: 26, rh: 16 };
+const PLAZA = { cx: 200, cy: 350, rx: 118, ry: 40 };
+const STONE_PATH = [[283, 172], [292, 191], [294, 212], [287, 233], [273, 255], [257, 277], [243, 299]];
+const FENCE_HD = [[-6, 202], [136, 134], [278, 204]];
+const smooth01 = t => { t = Math.max(0, Math.min(1, t)); return t * t * (3 - 2 * t); };
+function vnoise(x, y, s, seed = 0) {
+  x /= s; y /= s; const xi = Math.floor(x), yi = Math.floor(y), u = smooth01(x - xi), v = smooth01(y - yi), h = (a, b) => hash(a * 57.3 + b * 131.7 + seed * 17.1);
+  return (h(xi, yi) * (1 - u) + h(xi + 1, yi) * u) * (1 - v) + (h(xi, yi + 1) * (1 - u) + h(xi + 1, yi + 1) * u) * v;
+}
+const bayer = (x, y) => (BAYER[(y & 3) * 4 + (x & 3)] + .5) / 16;
+const shoreY = x => 104 + Math.sin(x * .045) * 3 + Math.sin(x * .13) * 1.5;
+const hillY = x => x < 196 ? 999 : 108 - 92 * smooth01((x - 196) / 210);
+function ridge(pts) { const f = x => { for (let i = 0; i < pts.length - 1; i++) { const [x0, y0] = pts[i], [x1, y1] = pts[i + 1]; if (x <= x1) { const t = (x - x0) / (x1 - x0); return [y0 + (y1 - y0) * t, y1 < y0]; } } return [pts[pts.length - 1][1], false]; }; return f; }
+const RIDGE_FAR = ridge([[-60, 58], [-14, 40], [22, 52], [58, 30], [94, 48], [130, 34], [166, 50], [204, 38], [240, 56], [276, 46], [420, 72]]);
+const RIDGE_NEAR = ridge([[-60, 72], [-10, 50], [24, 64], [64, 44], [104, 66], [140, 52], [176, 70], [212, 60], [256, 80], [420, 90]]);
+function plazaR(x, y) {
+  const dx = (x - PLAZA.cx) / PLAZA.rx, dy = (y - PLAZA.cy) / PLAZA.ry, th = Math.atan2(dy, dx);
+  return Math.hypot(dx, dy) / (1 + .06 * Math.sin(th * 3 + 1.3) + .04 * Math.sin(th * 7 + 2) + .02 * Math.sin(th * 13));
+}
+const inField = (x, y, grow = 0) => Math.abs(x - 136) / (132 + grow * 2) + Math.abs(y - 208) / (66 + grow) <= 1;
+function onPath(x, y, r = 12) { return STONE_PATH.some(([px, py]) => Math.hypot(x - px, (y - py) * 1.6) < r); }
+// 地面底色：一次逐像素算完（天空、山、海、山坡、草地、空地）
+function paintTerrain(g, Wc, Hc, OX) {
+  const im = g.createImageData(Wc, Hc), d = im.data;
+  const put = (i, hex) => { const c = rgb(hex); d[i] = c[0]; d[i + 1] = c[1]; d[i + 2] = c[2]; d[i + 3] = 255; };
+  for (let py = 0; py < Hc; py++) for (let px = 0; px < Wc; px++) {
+    const x = px - OX, y = py, i = (py * Wc + px) * 4, b = bayer(px, py), hy = hillY(x), sy = shoreY(x);
+    let col;
+    if (y < 78 && y < hy) {
+      const [rn, upN] = RIDGE_NEAR(x), [rf, upF] = RIDGE_FAR(x);
+      if (y >= rn) col = y > 72 ? HP.mtn[0] : upN ? HP.mtn[1] : HP.mtn[3];
+      else if (y >= rf) col = y > 70 ? HP.mtnFar[0] : upF ? HP.mtnFar[1] : HP.mtnFar[2];
+      else continue;   // 天空留空，由 skyHD 一层垫在下面
+      if (y >= rn && y < rn + 2 && upN) col = HP.mtn[0];   // 山脊受光的一条亮边
+      if (y >= rn && y < rn + 12 && hash(Math.floor(x / 3) * 7.7) > .72 && !upN) col = HP.mtn[4];
+      if (y >= rn && y < rn + 8 && hash(Math.floor(x / 3) * 3.1) > .76 && upN) col = HP.mtn[2];
+      if (y >= rf && y < rn && y < rf + 1 && upF) col = HP.mtnFar[0];
+    } else if (y < Math.min(sy, hy)) {
+      const dpt = y - 78;
+      col = dpt < 2 ? HP.sea[1] : dpt < 9 ? HP.sea[2] : (sy - y < 5 ? HP.sea[2] : HP.sea[3]);
+      if (dpt > 9 && dpt < 14 && b > .7) col = HP.sea[2];
+      if (y > 80 && sy - y > 4 && hash(Math.floor(x / 7) * 13.1 + y * 31.7) > .955) col = hash(x + y) > .5 ? HP.sea[0] : HP.sea[1];
+    } else {
+      // 草地（含右边山坡）：大色块 + 细碎亮点暗点
+      const n = vnoise(x, y, 34, 1) + (b - .5) * .1, h = hash(x * 3.13 + y * 7.71);
+      col = n > .7 ? HP.g[1] : n < .27 ? HP.g[3] : HP.g[2];
+      if (h > .975) col = HP.g[0]; else if (h < .02) col = HP.g[4];
+      if (hy < sy && y < hy + 3) col = HP.g[1];   // 山坡顶边受光
+      if (sy <= hy && y < sy + 2) col = hash(x * 1.7) > .3 ? '#ffffff' : HP.sea[0];   // 浪花
+      else if (sy <= hy && y < sy + 5) col = HP.sand[1 + (hash(x * .9 + y) > .6 ? 1 : 0)];
+      else if (sy <= hy && y < sy + 6) col = HP.g[4];
+      if (inField(x, y, 6) && !inField(x, y, 2)) col = n > .5 ? HP.g[4] : HP.g[3];   // 菜地外一圈压暗，地块像嵌在地上
+      const pr = plazaR(x, y) + (hash(x * 1.31 + y * 7.9) - .5) * .035;
+      if (pr < 1) {
+        const ns = vnoise(x, y, 26, 3) + (b - .5) * .1;
+        col = ns > .72 ? HP.sand[1] : ns < .24 ? HP.sand[3] : HP.sand[2];
+        if (pr < .45 && ns > .6) col = HP.sand[1];
+        if (pr > .92 && y < PLAZA.cy) col = HP.sand[3];   // 上沿被草挡住，压一圈阴影
+        if (pr > .97) col = HP.sand[4];
+        if (hash(x * 5.7 + y * 2.3) > .992) col = HP.sand[4];
+      } else if (pr < 1.06) col = HP.g[3];
+      if (onPath(x, y, 15) && !onPath(x, y, 9) && pr >= 1) col = HP.g[3];
     }
-    for (let x = -6; x < W + 6; x += 7) { const u = x - ox, y = 42 + Math.round(Math.sin(u * .3) * 2); E(g, x, y, 5 + hash(u) * 2, 5, PAL.g3); E(g, x - 1, y - 1, 3, 2.6, PAL.g2); }   // 树林
-    R(g, 0, 46, W, FARM.h - 46, C.grass);
-    for (let i = 0; i < W * 2; i++) { const x = Math.floor(hash(i * 3.1) * W), y = 47 + Math.floor(hash(i * 7.7) * (FARM.h - 47)); P(g, x, y, i % 3 ? C.grass2 : C.grass3); if (i % 7 === 0) P(g, x, y - 1, C.grass2); }
-    g.save(); g.translate(ox, 0);
-    for (let x = -ox - 2; x < W - ox + 2; x++) {   // V 形土路，向两边延伸出画面
-      const yc = x < 90 ? 184 - (90 - x) * .5 : 184 - (x - 90) * .5;
-      R(g, x, yc - 5, 1, 11, PAL.w0); P(g, x, yc - 6, PAL.w1); P(g, x, yc + 6, PAL.w1);
-      if (hash(x * 1.7) > .7) P(g, x, yc - 2 + Math.floor(hash(x) * 6), PAL.w1);
+    put(i, col);
+  }
+  g.putImageData(im, 0, 0);
+}
+// 一团叶子：底色暗、往左上一层层提亮，最后描深绿边
+function foliage(w, h, blobs, ramp = HP.leaf, seed = 1, fruit) {
+  const c = hdCanvas(w, h, g => {
+    blobs.forEach(([x, y, r]) => E(g, x, y, r, r * .9, ramp[3]));
+    blobs.forEach(([x, y, r]) => E(g, x - r * .14, y - r * .2, r * .84, r * .74, ramp[2]));
+    blobs.forEach(([x, y, r]) => E(g, x - r * .3, y - r * .38, r * .5, r * .42, ramp[1]));
+    blobs.forEach(([x, y, r], i) => { if (i % 2 === 0) E(g, x - r * .4, y - r * .5, r * .2, r * .16, ramp[0]); });
+    g.globalCompositeOperation = 'source-atop';
+    for (let i = 0; i < w * h / 26; i++) { const x = Math.floor(hash(seed * 9.1 + i * 1.7) * w), y = Math.floor(hash(seed * 3.3 + i * 2.9) * h); P(g, x, y, ramp[4]); P(g, x + 1, y - 1, ramp[4]); }
+    if (fruit) blobs.forEach(([x, y, r], i) => { if (i % 2) return; const fx = x + (hash(i + seed) - .5) * r, fy = y + (hash(i * 3 + seed) - .3) * r * .6; E(g, fx, fy, 2.4, 2.4, fruit[0]); P(g, fx - 1, fy - 1, fruit[1]); });
+    g.globalCompositeOperation = 'source-over';
+  });
+  return hdOutline(c);
+}
+function obj(w, h, fn, light = .8) { const c = hdCanvas(w, h, fn); if (light) hdLight(c, light); return hdOutline(c); }
+const pathCol = (g, pts, col, w = 1) => { for (let i = 0; i < pts.length - 1; i++) L(g, ...pts[i], ...pts[i + 1], col, w); };
+// ---- 房子：奶油色墙、木梁、金色瓦片屋顶、红窗板、窗下花箱、门上小雨棚 ----
+function houseHD() {
+  return spr('hd:house', () => {
+    const c = hdCanvas(132, 132, g => {
+      const { a, b, h, rh } = HOUSEHD, S = isoS(60, 70), Q = pts => pts.map(p => S(...p)), o = 3, m = b / 2, z1 = h, z2 = h + rh;
+      const cr = HP.cream, wd = HP.wood, rf = HP.roof;
+      // 烟囱（在后坡，先画）
+      poly(g, Q([[20, 5, 50], [24, 5, 50], [24, 5, 86], [20, 5, 86]]), HP.stone[2]); poly(g, Q([[24, 5, 50], [24, 1, 50], [24, 1, 86], [24, 5, 86]]), HP.stone[3]);
+      poly(g, Q([[19.5, .5, 86], [24.5, .5, 86], [24.5, 5.5, 86], [19.5, 5.5, 86]]), HP.stone[1]); poly(g, Q([[20.5, 1.5, 86], [23.5, 1.5, 86], [23.5, 4.5, 86], [20.5, 4.5, 86]]), '#3a2a2e');
+      for (let z = 54; z < 86; z += 6) L(g, ...S(20, 5, z), ...S(24, 5, z), HP.stone[3]);
+      // 墙
+      poly(g, Q([[0, b, 0], [a, b, 0], [a, b, h], [0, b, h]]), cr[1]);
+      poly(g, Q([[a, b, 0], [a, 0, 0], [a, 0, h], [a, b, h]]), cr[3]);
+      poly(g, Q([[a, b, h], [a, 0, h], [a, m, z2]]), cr[3]);
+      for (let i = 0; i < 70; i++) { const u = hash(i * 1.9) * a, v = hash(i * 4.1) * h; P(g, ...S(u, b, v), cr[2]); const u2 = hash(i * 2.7) * b, v2 = hash(i * 5.3) * h; P(g, ...S(a, u2, v2), cr[4]); }
+      // 石头墙脚
+      poly(g, Q([[0, b, 0], [a, b, 0], [a, b, 6], [0, b, 6]]), HP.stone[2]); poly(g, Q([[a, b, 0], [a, 0, 0], [a, 0, 6], [a, b, 6]]), HP.stone[3]);
+      for (let x = 0; x < a; x += 4) L(g, ...S(x + (x % 8 ? 0 : 2), b, 0), ...S(x + (x % 8 ? 0 : 2), b, 6), HP.stone[4]); L(g, ...S(0, b, 3), ...S(a, b, 3), HP.stone[3]); L(g, ...S(0, b, 6), ...S(a, b, 6), HP.stone[1]);
+      for (let y = 0; y < b; y += 4) L(g, ...S(a, y, 0), ...S(a, y, 6), HP.stone[4]);
+      // 木梁
+      const beam = (p0, p1, col, w = 2) => L(g, ...S(...p0), ...S(...p1), col, w);
+      beam([0, b, 6], [0, b, h], wd[4]); beam([a, b, 6], [a, b, h], wd[4]); beam([0, b, h - 1], [a, b, h - 1], wd[4]); beam([0, b, 26], [10, b, 26], wd[4]); beam([20, b, 26], [a, b, 26], wd[4]);
+      beam([a, 0, 6], [a, 0, h], wd[5]); beam([a, 0, h - 1], [a, b, h - 1], wd[5]); beam([a, 0, 26], [a, b, 26], wd[5]);
+      // 窗户：蓝玻璃、白窗框、红窗板、花箱
+      const win = (face, u0, u1, z0, z3) => {
+        const F = face === 'b' ? (u, z) => S(u, b, z) : (u, z) => S(a, b - u, z), QF = pts => pts.map(([u, z]) => F(u, z));
+        poly(g, QF([[u0 - 2.6, z0], [u0, z0], [u0, z3], [u0 - 2.6, z3]]), HP.red[face === 'b' ? 2 : 3]); poly(g, QF([[u1, z0], [u1 + 2.6, z0], [u1 + 2.6, z3], [u1, z3]]), HP.red[face === 'b' ? 2 : 3]);
+        for (let z = z0 + 2; z < z3; z += 3) { L(g, ...F(u0 - 2.4, z), ...F(u0 - .2, z), HP.red[4]); L(g, ...F(u1 + .2, z), ...F(u1 + 2.4, z), HP.red[4]); }
+        poly(g, QF([[u0, z0], [u1, z0], [u1, z3], [u0, z3]]), cr[0]);
+        poly(g, QF([[u0 + .8, z0 + 1], [u1 - .8, z0 + 1], [u1 - .8, z3 - 1], [u0 + .8, z3 - 1]]), face === 'b' ? '#5fb4ec' : '#3f86c8');
+        poly(g, QF([[u0 + .8, z3 - 5], [u0 + 2.6, z3 - 1], [u0 + .8, z3 - 1]]), '#bfe8ff');
+        L(g, ...F((u0 + u1) / 2, z0 + 1), ...F((u0 + u1) / 2, z3 - 1), cr[0]); L(g, ...F(u0 + .8, (z0 + z3) / 2), ...F(u1 - .8, (z0 + z3) / 2), cr[0]);
+        poly(g, QF([[u0 - 1.5, z0 - 4], [u1 + 1.5, z0 - 4], [u1 + 1.5, z0], [u0 - 1.5, z0]]), wd[3]); L(g, ...F(u0 - 1.5, z0), ...F(u1 + 1.5, z0), wd[1]);
+        for (let u = u0 - 1; u <= u1 + 1; u += 1.3) { const [fx, fy] = F(u, z0 + 1); P(g, fx, fy, HP.leaf[2]); P(g, fx, fy - 1, [HP.pink[2], HP.straw[1], '#ffffff', HP.red[1]][Math.floor(u * 3) % 4]); }
+      };
+      win('b', 3, 8, 16, 28); win('b', 22, 26.5, 16, 28); win('a', 8, 15, 18, 30);
+      // 山墙上的小圆窗
+      { const [gx, gy] = S(a, m, h + 12); E(g, gx, gy, 4, 4, cr[0]); E(g, gx, gy, 2.8, 2.8, '#3f86c8'); P(g, gx - 1, gy - 1, '#bfe8ff'); }
+      // 门 + 小雨棚 + 台阶
+      poly(g, Q([[10.5, b, 0], [19.5, b, 0], [19.5, b, 33], [10.5, b, 33]]), wd[5]);
+      poly(g, Q([[11.5, b, 0], [18.5, b, 0], [18.5, b, 31], [11.5, b, 31]]), wd[2]);
+      for (let u = 13; u < 18.5; u += 2) L(g, ...S(u, b, 1), ...S(u, b, 30), wd[3]);
+      poly(g, Q([[12.5, b, 22], [17.5, b, 22], [17.5, b, 28], [12.5, b, 28]]), '#5fb4ec'); L(g, ...S(15, b, 22), ...S(15, b, 28), wd[3]);
+      { const [kx, ky] = S(17.2, b, 14); R(g, kx, ky, 2, 2, HP.straw[1]); P(g, kx, ky, '#ffffff'); }
+      poly(g, Q([[9, b, 36], [21, b, 36], [21, b + 6, 32], [9, b + 6, 32]]), wd[2]); L(g, ...S(9, b + 6, 32), ...S(21, b + 6, 32), wd[4], 2); L(g, ...S(9, b, 36), ...S(21, b, 36), wd[1]);
+      L(g, ...S(9.5, b + 5, 32), ...S(9.5, b, 30), wd[4]); L(g, ...S(20.5, b + 5, 32), ...S(20.5, b, 30), wd[4]);
+      // 屋顶：后坡、前坡、瓦片、檐口、屋脊
+      poly(g, Q([[-o, m, z2], [a + o, m, z2], [a + o, -o, z1], [-o, -o, z1]]), rf[3]);
+      poly(g, Q([[-o, b + o, z1], [a + o, b + o, z1], [a + o, m, z2], [-o, m, z2]]), rf[2]);
+      const rows = 7;
+      for (let k = 0; k < rows; k++) {
+        const t0 = k / rows, t1 = (k + 1) / rows, yA = b + o - (b + o - m) * t0, zA = z1 + (z2 - z1) * t0, yB = b + o - (b + o - m) * t1, zB = z1 + (z2 - z1) * t1;
+        poly(g, Q([[-o, yA, zA], [a + o, yA, zA], [a + o, yA - (yA - yB) * .35, zA + (zB - zA) * .35], [-o, yA - (yA - yB) * .35, zA + (zB - zA) * .35]]), k % 2 ? rf[1] : rf[2]);
+        L(g, ...S(-o, yA, zA), ...S(a + o, yA, zA), rf[4]);
+        for (let x = -o + (k % 2 ? 2 : 0); x < a + o; x += 4) L(g, ...S(x, yA, zA), ...S(x, yA - (yA - yB) * .9, zA + (zB - zA) * .9), rf[3]);
+        for (let x = -o + (k % 2 ? 3 : 1); x < a + o; x += 4) P(g, ...S(x, yA - (yA - yB) * .5, zA + (zB - zA) * .5), rf[0]);
+      }
+      L(g, ...S(-o, b + o, z1), ...S(a + o, b + o, z1), wd[4], 2); L(g, ...S(-o, b + o, z1 - 1.5), ...S(a + o, b + o, z1 - 1.5), wd[2]);
+      L(g, ...S(a + o, b + o, z1), ...S(a + o, m, z2), wd[3], 2); L(g, ...S(a + o, m, z2), ...S(a + o, -o, z1), wd[4], 2);
+      L(g, ...S(-o, m, z2), ...S(a + o, m, z2), rf[4], 2); L(g, ...S(-o, m, z2 + 1.5), ...S(a + o, m, z2 + 1.5), rf[0]);
+      // 门口台阶
+      { const [sx2, sy2] = S(15, b + 3, 0); E(g, sx2, sy2 + 1, 11, 4, HP.stone[3]); E(g, sx2 - 1, sy2, 10, 3.2, HP.stone[1]); }
+    });
+    return hdOutline(c);
+  });
+}
+// 窗户的四边形（夜里亮灯用），高清设计坐标
+function houseWinsHD() {
+  const { sx, sy, a, b } = HOUSEHD, S = isoS(sx, sy), q = (face, u0, u1, z0, z3) => (face === 'b' ? [[u0, z0], [u1, z0], [u1, z3], [u0, z3]].map(([u, z]) => S(u + .8 * (u === u0 ? 1 : -1), b, z + (z === z0 ? 1 : -1))) : [[u0, z0], [u1, z0], [u1, z3], [u0, z3]].map(([u, z]) => S(a, b - u - .8 * (u === u0 ? 1 : -1), z + (z === z0 ? 1 : -1))));
+  return [q('b', 3, 8, 16, 28), q('b', 22, 26.5, 16, 28), q('a', 8, 15, 18, 30)];
+}
+// ---- 鸡舍：木板墙、红屋顶、黑门洞和小坡道 ----
+function coopHD() {
+  return spr('hd:coop', () => {
+    const c = hdCanvas(80, 76, g => {
+      const { a, b, h, rh } = COOPHD, S = isoS(38, 40), Q = pts => pts.map(p => S(...p)), o = 2, m = b / 2, z1 = h, z2 = h + rh, wd = HP.wood;
+      poly(g, Q([[0, b, 0], [a, b, 0], [a, b, h], [0, b, h]]), wd[2]); poly(g, Q([[a, b, 0], [a, 0, 0], [a, 0, h], [a, b, h]]), wd[3]); poly(g, Q([[a, b, h], [a, 0, h], [a, m, z2]]), wd[3]);
+      for (let x = 2; x < a; x += 3) L(g, ...S(x, b, 1), ...S(x, b, h - 1), wd[3]); for (let y = 2; y < b; y += 3) L(g, ...S(a, y, 1), ...S(a, y, h - 1), wd[4]);
+      for (let x = 1; x < a; x += 3) P(g, ...S(x, b, h - 3), wd[1]);
+      poly(g, Q([[5, b, 0], [11, b, 0], [11, b, 14], [5, b, 14]]), '#2c1d24'); poly(g, Q([[5, b, 14], [11, b, 14], [8, b, 17]]), '#2c1d24');
+      poly(g, Q([[5, b, 0], [11, b, 0], [11, b + 8, -4], [5, b + 8, -4]]), wd[1]); for (let t = 2; t < 8; t += 2.5) L(g, ...S(5, b + t, -t / 2), ...S(11, b + t, -t / 2), wd[3]);
+      { const [wx, wy] = S(a, 7, 16); R(g, wx - 3, wy - 3, 6, 5, '#2c1d24'); P(g, wx - 2, wy - 2, HP.straw[1]); }
+      poly(g, Q([[-o, m, z2], [a + o, m, z2], [a + o, -o, z1], [-o, -o, z1]]), HP.red[3]);
+      poly(g, Q([[-o, b + o, z1], [a + o, b + o, z1], [a + o, m, z2], [-o, m, z2]]), HP.red[1]);
+      for (let k = 1; k < 4; k++) { const t = k / 4, yy = b + o - (b + o - m) * t, zz = z1 + (z2 - z1) * t; L(g, ...S(-o, yy, zz), ...S(a + o, yy, zz), HP.red[2]); L(g, ...S(-o, yy + .6, zz - .8), ...S(a + o, yy + .6, zz - .8), HP.red[0]); }
+      L(g, ...S(-o, b + o, z1), ...S(a + o, b + o, z1), HP.red[3], 2); L(g, ...S(-o, m, z2), ...S(a + o, m, z2), HP.red[4], 2); L(g, ...S(a + o, b + o, z1), ...S(a + o, m, z2), HP.red[2], 2);
+    });
+    return hdOutline(c);
+  });
+}
+// ---- 栅栏：菜地后面两条边，木桩带圆头，两道横杆 ----
+function fenceHD(g) {
+  const c = hdCanvas(300, 110, gg => {
+    gg.translate(10, 0);
+    const posts = [];
+    for (let s = 0; s < FENCE_HD.length - 1; s++) {
+      const [x0, y0] = FENCE_HD[s], [x1, y1] = FENCE_HD[s + 1], n = Math.round(Math.hypot(x1 - x0, y1 - y0) / 24);
+      for (let k = 0; k <= n; k++) if (k < n || s === FENCE_HD.length - 2) posts.push([x0 + (x1 - x0) * k / n, y0 + (y1 - y0) * k / n - 100]);
+      [[9, HP.wood[2]], [17, HP.wood[2]]].forEach(([hgt, col]) => { L(gg, x0, y0 - 100 - hgt, x1, y1 - 100 - hgt, HP.wood[3], 3); L(gg, x0, y0 - 101 - hgt, x1, y1 - 101 - hgt, col); L(gg, x0, y0 - 102 - hgt, x1, y1 - 102 - hgt, HP.wood[1]); });
     }
-    const S = isoS(HOUSE.sx, HOUSE.sy);   // 门口到菜地的石板路
-    for (let k = 0; k < 5; k++) { const [x, y] = S(9.5 + k * 3, HOUSE.b + 1.5, 0); E(g, x, y + 1, 3, 1.6, PAL.n3); E(g, x - .5, y + .5, 2.4, 1.1, PAL.n2); }
-    isoShadow(g, isoS(HOUSE.sx, HOUSE.sy), HOUSE.a, HOUSE.b); g.drawImage(houseSpr(), HOUSE.sx - 28, HOUSE.sy - 35);
-    isoShadow(g, isoS(COOP.sx, COOP.sy), COOP.a, COOP.b); g.drawImage(coopSpr(), COOP.sx - 20, COOP.sy - 20);
-    flowerPatch(g, 8, 70, 7, 3); flowerPatch(g, 58, 70, 5, 9);
-    shadow(g, 16, 112, 6, 1.6); g.drawImage(scarecrowSpr(), 4, 77);
-    shadow(g, 20, 180, 12, 1.6); g.drawImage(signSpr(), 4, 160);
-    shadow(g, 154, 176, 9, 2); g.drawImage(haySpr(), 144, 162);
-    shadow(g, 176, 182, 9, 2.5); g.drawImage(treeSpr(), 164, 152);
-    g.drawImage(mushSpr(), 151, 177); g.drawImage(mushSpr(), 158, 180);
-    flowerPatch(g, 62, 170, 9, 21); flowerPatch(g, 104, 172, 6, 31); flowerPatch(g, 36, 182, 5, 41);
-    shadow(g, 120, 183, 8, 2); g.drawImage(bushSpr(), 112, 172);
-    g.restore();
+    posts.forEach(([x, y]) => { R(gg, x - 3, y - 22, 6, 22, HP.wood[2]); R(gg, x - 3, y - 22, 2, 22, HP.wood[1]); R(gg, x + 2, y - 22, 1, 22, HP.wood[3]); E(gg, x, y - 22, 3.2, 1.6, HP.wood[0]); R(gg, x - 3, y - 2, 6, 2, HP.wood[4]); });
+  });
+  hdOutline(c); g.drawImage(c, -10, 100);
+}
+// ---- 小道具 ----
+const mailboxHD = () => spr('hd:mailbox', () => obj(26, 40, g => {
+  R(g, 10, 15, 4, 25, HP.wood[3]); R(g, 10, 15, 1, 25, HP.wood[2]);
+  R(g, 2, 6, 18, 11, HP.red[2]); R(g, 3, 4, 16, 3, HP.red[1]); R(g, 4, 3, 14, 1, HP.red[1]); R(g, 2, 14, 18, 3, HP.red[3]); R(g, 4, 9, 10, 1, HP.red[3]);
+  R(g, 21, 2, 2, 10, HP.wood[4]); R(g, 21, 2, 4, 3, HP.straw[1]);
+  E(g, 5, 36, 4, 2.4, HP.red[1]); P(g, 3, 35, '#ffffff'); P(g, 6, 35, '#ffffff'); R(g, 4, 37, 2, 3, HP.cream[1]);
+}));
+const chairHD = () => spr('hd:chair', () => obj(24, 30, g => {
+  R(g, 4, 2, 3, 22, HP.wood[3]); R(g, 14, 2, 3, 22, HP.wood[3]); for (let y = 4; y < 14; y += 4) R(g, 4, y, 13, 2, HP.wood[2]);
+  poly(g, [[2, 15], [18, 15], [22, 19], [6, 19]], HP.wood[1]); R(g, 6, 19, 2, 8, HP.wood[3]); R(g, 19, 19, 2, 8, HP.wood[3]); R(g, 3, 17, 2, 8, HP.wood[2]);
+  L(g, 1, 27, 22, 27, HP.wood[4], 2);
+}));
+const sunflowerHD = () => spr('hd:sunflower', () => obj(30, 54, g => {
+  poly(g, [[6, 38], [24, 38], [22, 52], [8, 52]], '#c9643c'); R(g, 5, 36, 20, 4, '#e07c4c'); R(g, 7, 48, 16, 4, '#9a4a2c');
+  L(g, 15, 37, 15, 16, HP.leaf[3], 2); E(g, 9, 28, 5, 2.4, HP.leaf[2]); E(g, 21, 24, 5, 2.4, HP.leaf[2]); E(g, 8, 27, 2.4, 1, HP.leaf[1]);
+  for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; E(g, 15 + Math.cos(a) * 8, 12 + Math.sin(a) * 8, 3.4, 3.4, k % 2 ? HP.straw[1] : HP.straw[2]); }
+  E(g, 15, 12, 5.5, 5.5, HP.wood[4]); E(g, 14, 11, 3, 3, HP.wood[3]); P(g, 13, 10, HP.wood[2]); P(g, 16, 13, HP.wood[5]);
+}, .5));
+const hayHD = () => spr('hd:hay', () => obj(44, 40, g => {
+  L(g, 30, 2, 26, 22, HP.wood[3], 2); R(g, 27, 0, 8, 4, HP.stone[3]); R(g, 28, 0, 6, 1, HP.stone[1]);
+  E(g, 20, 28, 19, 11, HP.straw[3]); E(g, 19, 25, 16, 10, HP.straw[2]); E(g, 17, 21, 10, 6, HP.straw[1]); E(g, 15, 18, 5, 3, HP.straw[0]);
+  for (let i = 0; i < 26; i++) { const x = 4 + hash(i * 2.3) * 32, y = 18 + hash(i * 5.1) * 18; L(g, x, y, x + (hash(i) - .5) * 4, y + 4, i % 3 ? HP.straw[4] : HP.straw[1]); }
+}, .4));
+const treeHD = () => spr('hd:tree', () => {
+  const t = obj(14, 30, g => { R(g, 3, 0, 8, 30, HP.wood[3]); R(g, 3, 0, 3, 30, HP.wood[2]); R(g, 9, 0, 2, 30, HP.wood[4]); L(g, 6, 8, 6, 14, HP.wood[4]); P(g, 2, 28, HP.wood[3]); P(g, 11, 28, HP.wood[4]); }, 0);
+  const f = foliage(56, 46, [[16, 26, 13], [30, 18, 15], [42, 26, 12], [24, 32, 12], [36, 34, 11]], HP.leaf, 4, [HP.red[1], '#ffffff']);
+  const [c, g] = mk(56, 74); g.drawImage(t, 21, 42); g.drawImage(f, 0, 0); return c;
+});
+const signHD = () => spr('hd:sign', () => obj(66, 44, g => {
+  R(g, 8, 26, 5, 18, HP.wood[3]); R(g, 52, 26, 5, 18, HP.wood[3]);
+  R(g, 0, 2, 66, 28, HP.wood[1]); R(g, 0, 15, 66, 1, HP.wood[3]); R(g, 0, 2, 66, 2, HP.wood[0]); R(g, 0, 27, 66, 3, HP.wood[3]);
+  [[3, 6], [60, 6], [3, 22], [60, 22]].forEach(([x, y]) => P(g, x, y, HP.wood[5]));
+  const t2 = (s, y, col) => { const w = textW(s) * 2; let cx = Math.round((66 - w) / 2); for (const ch of s) { const gl = GLYPH[ch] || GLYPH[' ']; gl.forEach((row, j) => [...row].forEach((v, i) => { if (v === '#') R(g, cx + i * 2, y + j * 2, 2, 2, col); })); cx += (gl[0].length + 1) * 2; } };
+  t2('DOUDOU', 4, HP.wood[5]); t2('FARM', 17, HP.red[3]);
+}, .5));
+const potFlowersHD = () => spr('hd:potfl', () => obj(32, 40, g => {
+  poly(g, [[6, 24], [26, 24], [23, 39], [9, 39]], '#c9643c'); R(g, 5, 22, 22, 4, '#e07c4c'); R(g, 8, 35, 16, 4, '#9a4a2c');
+  E(g, 16, 20, 12, 5, HP.leaf[3]); E(g, 10, 18, 4, 2, HP.leaf[2]); E(g, 22, 17, 4, 2, HP.leaf[2]);
+  [[9, 12], [16, 8], [23, 11], [12, 17], [20, 16], [16, 13], [6, 17], [26, 16]].forEach(([x, y], i) => { [[-2, 0], [2, 0], [0, -2], [0, 2], [-1.5, -1.5]].forEach(([dx, dy]) => E(g, x + dx, y + dy, 1.8, 1.8, i % 3 ? HP.blue[2] : HP.blue[1])); P(g, x, y, HP.straw[1]); });
+}, .4));
+const mushHD = () => spr('hd:mush', () => obj(14, 12, g => { E(g, 7, 5, 6.5, 4.4, HP.red[1]); R(g, 1, 5, 13, 2, HP.red[2]); P(g, 4, 3, '#ffffff'); P(g, 8, 2, '#ffffff'); P(g, 10, 5, '#ffffff'); R(g, 5, 7, 4, 5, HP.cream[1]); }, .5));
+const bushHD = (n) => spr('hd:bush' + n, () => foliage([44, 36, 60][n], [24, 20, 34][n], [[[10, 14, 9], [22, 10, 11], [33, 14, 9]], [[9, 12, 8], [20, 10, 9], [28, 13, 7]], [[10, 22, 10], [24, 14, 13], [40, 18, 12], [50, 24, 9], [30, 26, 10]]][n], HP.leaf, n + 7));
+const grassTuft = (g, x, y, s = 1, k = 0) => { const c = [HP.g[4], HP.g[3], HP.g[2]]; L(g, x, y, x - 2 * s, y - 4 * s, c[k % 2]); L(g, x + 1, y, x + 1, y - 5 * s, c[(k + 1) % 2]); L(g, x + 2, y, x + 4 * s, y - 3 * s, c[k % 2]); P(g, x + 1, y - 5 * s, HP.g[1]); };
+function flowersHD(g, x, y, n, seed) { for (let i = 0; i < n; i++) { const fx = x + Math.floor(hash(seed + i) * 26), fy = y + Math.floor(hash(seed + i * 3.3) * 12); P(g, fx, fy + 1, HP.g[4]); P(g, fx, fy + 2, HP.g[4]); const col = ['#ffffff', HP.straw[1], HP.pink[2], HP.blue[1]][i % 4]; P(g, fx, fy, col); P(g, fx - 1, fy, col); P(g, fx + 1, fy, col); P(g, fx, fy - 1, col); P(g, fx, fy, HP.straw[0]); } }
+function stoneHD(g, x, y, rx, ry, k = 0) { E(g, x + 1, y + 1.5, rx + 1, ry + 1, HP.stone[5]); E(g, x, y, rx, ry, HP.stone[3]); E(g, x - .5, y - .8, rx - .8, ry - .9, HP.stone[2 - (k % 2)]); E(g, x - rx * .35, y - ry * .4, rx * .35, ry * .3, HP.stone[0]); }
+// ---- 天空（缓存：时段 × 屏宽）：几条色带，交界处抖动；夜里有星星 ----
+const skyHD = (ph, W) => spr(`hdsky:${ph}:${W}`, () => hdCanvas(W * 2, 80, g => {
+  const sky = HP.sky[ph];
+  for (let y = 0; y < 80; y++) for (let x = 0; x < W * 2; x++) { const t = Math.min(1, y / 78) * (sky.length - 1), k = Math.min(sky.length - 2, Math.floor(t)), f = t - k; P(g, x, y, f + (bayer(x, y) - .5) * .5 > .5 ? sky[k + 1] : sky[k]); }
+  if (ph === 'night') for (let i = 0; i < 70; i++) P(g, Math.floor(hash(i) * W * 2), Math.floor(hash(i + 50) * 60), i % 3 ? '#a6c8ff' : '#ffffff');
+}));
+// ---- 背景（按屏宽缓存）：地面 + 所有不动的东西；天空透明，夜色在上面另外压 ----
+function farmBgHD(W) {
+  return spr(`hdbg:${W}`, () => {
+    const Wc = W * 2, Hc = FARM.h * 2, OX = FARM.ox * 2, [c, g] = mk(Wc, Hc);
+    free(() => {
+      paintTerrain(g, Wc, Hc, OX);
+      g.save(); g.translate(OX, 0);
+      // 右上的林子和沿岸的矮树丛
+      g.drawImage(foliage(200, 96, [[30, 70, 18], [56, 52, 22], [86, 40, 24], [116, 30, 26], [140, 44, 22], [100, 66, 20], [66, 78, 16], [130, 74, 18], [146, 18, 20], [172, 40, 24], [186, 70, 18], [180, 12, 20]], HP.leaf, 2), 236, -12);
+      g.drawImage(foliage(80, 50, [[16, 34, 13], [36, 26, 16], [58, 30, 14], [70, 40, 10]], HP.leaf, 3), 196, 66);
+      [[-16, 96, 1], [22, 100, 0], [100, 98, 1], [140, 100, 0]].forEach(([x, y, n]) => g.drawImage(bushHD(n), x, y));
+      // 地上的东西：石板路、空地石头、草簇、小花
+      STONE_PATH.forEach(([x, y], i) => { stoneHD(g, x - 5 + (i % 2) * 3, y, 7.5 + (i % 3), 4.2, i); stoneHD(g, x + 7 - (i % 2) * 3, y + 6, 5, 3, i + 1); });
+      [[118, 336, 9, 4], [168, 362, 7, 3.4], [232, 340, 10, 4.6], [276, 366, 8, 3.6], [140, 376, 6, 3], [206, 380, 8, 3.4], [96, 360, 5, 2.6], [258, 386, 5, 2.4], [300, 344, 6, 2.8], [190, 330, 5, 2.4]].forEach(([x, y, rx, ry], i) => stoneHD(g, x, y, rx, ry, i));
+      for (let i = 0; i < 96; i++) { const th = i / 96 * Math.PI * 2, r0 = 1 + .06 * Math.sin(th * 3 + 1.3) + .04 * Math.sin(th * 7 + 2) + .02 * Math.sin(th * 13), x = PLAZA.cx + Math.cos(th) * PLAZA.rx * r0, y = PLAZA.cy + Math.sin(th) * PLAZA.ry * r0; if (hash(i * 1.7) > .35) grassTuft(g, x + (hash(i) - .5) * 4, y + (Math.sin(th) > 0 ? -1 : 2), hash(i * 3) > .6 ? 1.3 : 1, i); }
+      for (let i = 0; i < 150; i++) { const x = hash(i * 7.3) * 400 - 20, y = 112 + hash(i * 3.9) * 286; if (plazaR(x, y) < 1.12 || inField(x, y, 8) || onPath(x, y, 14)) continue; grassTuft(g, x, y, hash(i) > .7 ? 1.2 : .8, i); }
+      [[150, 118, 7, 11], [8, 140, 6, 13], [196, 290, 7, 17], [40, 300, 8, 19], [300, 300, 6, 23], [320, 220, 5, 29], [88, 300, 6, 31], [240, 120, 6, 37], [20, 370, 5, 41]].forEach(([x, y, n, s]) => flowersHD(g, x, y, n, s));
+      // 立着的东西，从远到近
+      const put = (cv, x, y, sh) => { if (sh) { g.save(); g.globalAlpha = .26; E(g, sh[0], sh[1], sh[2], sh[3], '#2a2236'); g.restore(); } g.drawImage(cv, x, y); };
+      g.save(); g.globalAlpha = .24; poly(g, [[COOPHD.sx + 4, COOPHD.sy + 2], [COOPHD.sx + 42, COOPHD.sy + 21], [COOPHD.sx + 10, COOPHD.sy + 37], [COOPHD.sx - 28, COOPHD.sy + 18]], '#2a2236'); g.restore();
+      g.drawImage(coopHD(), COOPHD.sx - 38, COOPHD.sy - 40);
+      put(nestHD(), 72, 122, [89, 132, 16, 4]);
+      { const { sx, sy } = HOUSEHD; g.save(); g.globalAlpha = .24; poly(g, [[sx + 6, sy + 2], [sx + 66, sy + 32], [sx + 14, sy + 58], [sx - 46, sy + 28]], '#2a2236'); g.restore(); g.drawImage(houseHD(), sx - 60, sy - 70); }
+      put(chairHD(), 322, 170, [334, 197, 10, 3]);
+      put(sunflowerHD(), 342, 184, [357, 236, 11, 3]);
+      put(mailboxHD(), 304, 190, [316, 229, 8, 2.6]);
+      put(hdUp('scarecrow', scarecrowSpr), 6, 222, [28, 291, 12, 3]);
+      put(hayHD(), 298, 244, [318, 280, 18, 4]);
+      put(treeHD(), 322, 228, [350, 302, 18, 5]);
+      put(mushHD(), 332, 296, null); put(mushHD(), 342, 300, null);
+      put(signHD(), 10, 318, [44, 361, 26, 3.4]);
+      put(potFlowersHD(), 84, 358, [100, 397, 11, 2.6]);
+      g.restore();
+    });
     return c;
   });
 }
+// 栅栏单独一层：母鸡在它后面走，所以不能烤进背景
+const farmFenceHD = W => spr(`hdfence:${W}`, () => { const [c, g] = mk(W * 2, FARM.h * 2); free(() => { g.translate(FARM.ox * 2, 0); fenceHD(g); }); return c; });
+// 前景：画在豆豆前面的大树丛，框住画面下面两个角
+function farmFgHD(W) {
+  return spr(`hdfg:${W}`, () => {
+    const Wc = W * 2, Hc = FARM.h * 2, OX = FARM.ox * 2, [c, g] = mk(Wc, Hc);
+    free(() => {
+      g.translate(OX, 0);
+      g.drawImage(foliage(74, 50, [[12, 32, 14], [32, 24, 16], [52, 36, 13], [22, 44, 12], [64, 46, 9]], HP.leaf, 11), -OX - 22, Hc - 40);
+      g.drawImage(foliage(90, 58, [[18, 40, 13], [40, 28, 17], [64, 34, 17], [80, 46, 11], [46, 50, 13]], HP.leaf, 12), Wc - OX - 68, Hc - 44);
+    });
+    return c;
+  });
+}
+const hdCrop = (id, st, f = 0) => hdUp(`crop:${id}:${st}:${st === 3 ? f : 0}`, () => cropSpr(id, st, f));
+// 画面顺序：天空 → 太阳、云 → 背景 → 鸡蛋、母鸡 → 栅栏 → 地块和作物 → 前景树丛 → 夜色 → 豆豆（夜里只略暗）→ 气泡和名牌
 function drawFarm(t) {
   const W = FARM.w, ox = FARM.ox, g = FG, now = new Date(), ph = todPhase(now), hr = now.getHours() + now.getMinutes() / 60;
-  g.drawImage(farmBg(ph, W), 0, 0);
-  g.save(); g.beginPath(); g.rect(0, 0, W, 30); g.clip();
-  const sunPos = ph === 'night' ? (() => { const f = ((hr + 24 - 20) % 24) / 9; return [8 + f * (W - 16), 26 - Math.sin(Math.PI * f) * 18]; })() : (() => { const f = Math.min(1, Math.max(0, (hr - 5) / 15)); return [8 + f * (W - 16), 28 - Math.sin(Math.PI * f) * 22]; })();
+  g.setTransform(2, 0, 0, 2, 0, 0);
+  g.drawImage(skyHD(ph, W), 0, 0, W, 40);
+  const sunPos = ph === 'night' ? (() => { const f = ((hr + 24 - 20) % 24) / 9; return [10 + f * (W - 20), 30 - Math.sin(Math.PI * f) * 20]; })() : (() => { const f = Math.min(1, Math.max(0, (hr - 5) / 15)); return [10 + f * (W - 20), 32 - Math.sin(Math.PI * f) * 24]; })();
   FARM.sun = sunPos;
-  if (ph === 'night') { E(g, sunPos[0], sunPos[1], 4, 4, PAL.n1); E(g, sunPos[0] + 2, sunPos[1] - 1, 3.4, 3.4, PAL.n7); }
-  else { E(g, sunPos[0], sunPos[1], 5, 5, ph === 'day' ? PAL.y1 : PAL.y2); E(g, sunPos[0], sunPos[1], 3.6, 3.6, PAL.y0); }
+  hiRes(g, g => {
+    const [sx, sy] = sunPos.map(v => v * 2);
+    if (ph === 'night') { E(g, sx, sy, 9, 9, '#fff6d8'); E(g, sx + 4, sy - 3, 8, 8, HP.sky.night[1]); }
+    else { g.globalAlpha = .25; E(g, sx, sy, 17, 17, '#fff4c0'); g.globalAlpha = 1; E(g, sx, sy, 10, 10, ph === 'day' ? '#ffd23f' : '#ffb347'); E(g, sx, sy, 8, 8, '#ffe680'); E(g, sx - 3, sy - 3, 3, 3, '#fffbe0'); }
+  }, 0);
   g.globalAlpha = ph === 'night' ? .25 : 1;
-  [[0, 4, .0021], [90, 12, .0016], [160, 2, .0012]].forEach(([o, y, v]) => g.drawImage(cloudSpr(), Math.round(((t * v + o) % (W + 40)) - 24), y));
-  g.restore();
+  [[0, 6, .0021, 0], [90, 18, .0016, 1], [160, 2, .0012, 2]].forEach(([o, y, v, n]) => dh(g, cloudHD(n), Math.round(((t * v + o) % (W + 60)) - 32), y));
+  g.globalAlpha = 1;
+  g.drawImage(farmBgHD(W), 0, 0, W, FARM.h);   // 山、树、地面盖在太阳和云前面
   g.save(); g.translate(ox, 0);
-  shadow(g, 166, 77, 7, 2); E(g, 166, 76, 7, 2.6, PAL.w2); E(g, 166, 75, 6, 2, PAL.y2); L(g, 161, 75, 171, 75, PAL.w1);
-  for (let i = 0; i < S.nest.eggs; i++) g.drawImage(eggSmall(), 160 + i * 4, 70);
-  for (const k of PLOT_ORDER) { const p = S.plots[k], q = PLOTS[k]; g.drawImage(soilSpr(!p.open ? 'lock' : p.crop && !p.dry && !p.dead ? 'wet' : 'dry'), q.x - 24, q.y - 12); }
-  if (sel >= 0 && t - selT < 400) { const q = PLOTS[sel]; g.globalAlpha = .4; g.drawImage(soilSpr('lock'), q.x - 24, q.y - 13); g.globalAlpha = 1; }
+  for (let i = 0; i < S.nest.eggs; i++) dh(g, eggHD(), 39 + i * 3.5, 59);
+  if (HEN.wait > 0) HEN.wait--; else { HEN.x += HEN.dir * .18; if (HEN.x < 34 || HEN.x > 56) { HEN.dir *= -1; HEN.wait = 40 + Math.random() * 80 | 0; } }
+  const hf = HEN.wait > 0 ? 0 : (t / 200 | 0) % 2, hs = hdUp('hen' + hf, () => henSpr(hf));
+  shadowHD(g, HEN.x, 68, 4, 1.4);
+  g.save(); if (HEN.dir < 0) { g.translate(Math.round(HEN.x * 2) / 2 + 7, 0); g.scale(-1, 1); dh(g, hs, 0, 56); } else dh(g, hs, Math.round(HEN.x * 2) / 2 - 7, 56); g.restore();
+  g.translate(-ox, 0); g.drawImage(farmFenceHD(W), 0, 0, W, FARM.h); g.translate(ox, 0);
+  for (const k of PLOT_ORDER) { const p = S.plots[k], q = PLOTS[k]; dh(g, soilHD(!p.open ? 'lock' : p.crop && !p.dry && !p.dead ? 'wet' : 'dry'), q.x - 24, q.y - 12); }
+  if (sel >= 0 && t - selT < 400) { const q = PLOTS[sel]; g.globalAlpha = .45; dh(g, soilHD('lock'), q.x - 24, q.y - 13); g.globalAlpha = 1; }
   const blink = (t / 140 | 0) % 26 === 0 ? 1 : 0;
   for (const k of PLOT_ORDER) {
     const p = S.plots[k], q = PLOTS[k];
     if (!p.open) { g.drawImage(lockSpr(), q.x - 4, q.y - 6); continue; }
-    if (p.weeds > 0) g.drawImage(weedSpr(), q.x - 17, q.y - 6);
-    if (p.weeds > 1) g.drawImage(weedSpr(), q.x + 5, q.y - 1);
-    if (p.dead) { g.drawImage(deadSpr(), q.x - 15, q.y - 30); continue; }
+    if (p.weeds > 0) dh(g, hdUp('weed', weedSpr), q.x - 17, q.y - 6);
+    if (p.weeds > 1) dh(g, hdUp('weed', weedSpr), q.x + 5, q.y - 1);
+    if (p.dead) { dh(g, hdUp('dead', deadSpr), q.x - 15, q.y - 30); continue; }
     if (!p.crop) { if (Object.values(S.seeds).some(n => n > 0) && (t / 600 | 0) % 2) { R(g, q.x - 1, q.y - 3, 2, 6, PAL.g3); R(g, q.x - 3, q.y - 1, 6, 2, PAL.g3); } continue; }
     const st = stageOf(p), ripe = st === 3, bounce = ripe && Math.sin(t / 260 + k * 1.3) > .85 ? -1 : 0;
-    shadow(g, q.x + 1, q.y + 2, st >= 2 ? 9 : 4, 2, .25);
-    g.drawImage(cropSpr(p.crop, st, (blink + k) % 7 === 1 ? 1 : 0), q.x - 15, q.y - 30 + bounce);
+    shadowHD(g, q.x + 1, q.y + 2, st >= 2 ? 9 : 4, 2, .25);
+    dh(g, hdCrop(p.crop, st, (blink + k) % 7 === 1 ? 1 : 0), q.x - 15, q.y - 30 + bounce);
     if (ripe && (t / 900 + k * .37) % 1 < .3) { const sx = q.x - 10 + Math.floor(hash(k + Math.floor(t / 900)) * 20), sy = q.y - 24 - Math.floor(hash(k * 3 + Math.floor(t / 900)) * 8); P(g, sx, sy, PAL.n0); P(g, sx - 1, sy, PAL.y0); P(g, sx + 1, sy, PAL.y0); P(g, sx, sy - 1, PAL.y0); P(g, sx, sy + 1, PAL.y0); }
     for (let b = 0; b < p.bugs; b++) { const a = t / 700 + k + b * 3, bx = Math.round(q.x + Math.cos(a) * 11), by = Math.round(q.y + Math.sin(a) * 4), f = (t / 150 | 0) % 2; R(g, bx - 1, by - 1, 4, 3, C.ink); R(g, bx, by, 2, 1, PAL.r1); P(g, bx + (f ? -2 : 3), by + 1, C.ink); P(g, bx + (f ? 3 : -2), by, C.ink); }
   }
-  g.drawImage(fenceSpr(), 20, 106);
-  shadow(g, 52, 141, 4, 1.4); g.drawImage(mailboxSpr(), 45, 125);   // 信箱在栅栏前面
   for (let i = PT.length - 1; i >= 0; i--) { const p = PT[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; if (--p.life <= 0) { PT.splice(i, 1); continue; } R(g, p.x, p.y, p.s, p.s, p.col); }
   g.restore();
+  g.drawImage(farmFgHD(W), 0, 0, W, FARM.h);
   if (ph !== 'day') { g.fillStyle = NIGHT_TINT[ph]; g.fillRect(0, 0, W, FARM.h); }
   g.save(); g.translate(ox, 0);
   const night = ph === 'night' || ph === 'dusk';
   if (night) {
-    HOUSE_WIN().forEach(w => poly(g, w, PAL.y1));
-    const [dx, dy] = isoS(HOUSE.sx, HOUSE.sy)(9.5, HOUSE.b, 0);
+    hiRes(g, g => houseWinsHD().forEach(w => poly(g, w, '#ffe27a')));
+    const dx = (HOUSEHD.sx - 18) / 2, dy = (HOUSEHD.sy + 42) / 2;
     for (let i = 0; i < 26; i++) { const a = hash(i) * 6.28, r = 3 + hash(i + 7) * 9; if ((i + (t / 300 | 0)) % 5) P(g, dx + Math.cos(a) * r * 2, dy + Math.sin(a) * r * .8, PAL.y0); }
   }
-  if (HEN.wait > 0) HEN.wait--; else { HEN.x += HEN.dir * .18; if (HEN.x < 155 || HEN.x > 176) { HEN.dir *= -1; HEN.wait = 40 + Math.random() * 80 | 0; } }
-  const hf = HEN.wait > 0 ? 0 : (t / 200 | 0) % 2, hs = night ? dimSpr(henSpr(hf), .35, 'hen' + hf) : henSpr(hf);
-  shadow(g, HEN.x, 85, 4, 1.4);
-  g.save(); if (HEN.dir < 0) { g.translate(Math.round(HEN.x) + 7, 0); g.scale(-1, 1); g.drawImage(hs, 0, 74); } else g.drawImage(hs, Math.round(HEN.x) - 7, 74); g.restore();
   if (t > DD.next && Math.abs(DD.tt - DD.t) < .004) { DD.tt = .06 + Math.random() * .88; DD.next = t + 3000 + Math.random() * 5000; }
   const mv = Math.abs(DD.tt - DD.t) >= .004; if (mv) { DD.face = DD.tt > DD.t ? 1 : -1; DD.t += DD.face * .0034; }
   const [px, py] = pathAt(DD.t), df = mv ? (t / 160 | 0) % 2 : (t / 600 | 0) % 2, hy = DD.hop > 0 ? -Math.round(Math.sin(DD.hop * Math.PI) * 6) : 0; DD.hop = Math.max(0, DD.hop - .07);
-  const ds = night ? dimSpr(ddSpr('farm', df), .3, 'ddf' + df) : ddSpr('farm', df);
-  shadow(g, px + 1, py, 6, 2);
-  g.save(); if (DD.face < 0) { g.translate(Math.round(px) + 10, 0); g.scale(-1, 1); g.drawImage(ds, 0, Math.round(py) - 24 + hy); } else g.drawImage(ds, Math.round(px) - 10, Math.round(py) - 24 + hy); g.restore();
+  const d0 = ddHD(df), ds = night ? dimSpr(d0, .3, 'hddd' + df) : d0, X = Math.round(px * 2) / 2, Y = Math.round(py * 2) / 2;
+  shadowHD(g, px + 1, py, 6, 2);
+  g.save(); if (DD.face < 0) { g.translate(X + 10, 0); g.scale(-1, 1); dh(g, ds, 0, Y - 24 + hy); } else dh(g, ds, X - 10, Y - 24 + hy); g.restore();
   if (ph === 'night') for (let i = 0; i < 6; i++) { const fx2 = 20 + hash(i) * 140 + Math.sin(t / 900 + i) * 6, fy = 56 + hash(i + 9) * 80 + Math.cos(t / 700 + i * 2) * 4; if (Math.sin(t / 400 + i * 1.7) > -.2) P(g, fx2, fy, PAL.y0); }
   // 最上层：状态气泡、英文名牌（不受夜色影响）
   const ripeNow = PLOT_ORDER.filter(k => plotNeed(S.plots[k]) === 'ripe');
   if (!FARM.labels && t > chatNext && ripeNow.length) { CHAT = { k: ripeNow[Math.floor(Math.random() * ripeNow.length)], t0: t }; chatNext = t + 3800; }
+  const placed = [[-ox, 0, 52, 27]], items = [];   // 左上角「标签」按钮的位置也算占用
   for (const k of PLOT_ORDER) {
     const n = plotNeed(S.plots[k]); if (n === 'lock' || n === 'empty' || (!n && !FARM.labels)) continue;
     const q = PLOTS[k], p = S.plots[k], st = p.crop ? stageOf(p) : 0, top = p.dead ? 30 : st >= 2 ? 40 : 30, bob = Math.round(Math.sin(t / 320 + k) * 1);
     const talk = p.crop && (FARM.labels || (n === 'ripe' && CHAT && CHAT.k === k && t - CHAT.t0 < 1800)) ? CROPS[p.crop].en + (FARM.labels ? '' : '!') : null;
-    if (talk) drawLabel(g, talk, q.x, q.y - top + 2 + bob, true);
-    if (n && n !== 'ripe') g.drawImage(bubSpr(n), q.x - 7 + (talk ? Math.ceil(textW(talk) / 2) + 10 : 0), q.y - top - 6 + bob);
+    if (talk) items.push([talk, q.x, q.y - top + 2, true, bob]);
+    if (n && n !== 'ripe') { const bx = q.x - 7 + (talk ? Math.ceil(textW(talk) / 2) + 10 : 0), by = q.y - top - 6; g.drawImage(bubSpr(n), bx, by + bob); placed.push([bx, by, 14, 15]); }
   }
-  if (FARM.labels) {
-    SPOTS.forEach(s => { if (!s.noLabel) drawLabel(g, s.w, s.lx, s.ly); }); drawLabel(g, 'hen', HEN.x, 96); drawLabel(g, 'fence', 134, 142);
-  }
+  if (FARM.labels) { SPOTS.forEach(s => { if (!s.noLabel) items.push([s.w, s.lx, s.ly]); }); items.push(['hen', HEN.x, 54], ['fence', 14, 84]); }
+  placeLabels(g, items, placed);
   if (TAPLBL && t - TAPLBL.t0 < 2400) drawLabel(g, TAPLBL.w, TAPLBL.x, TAPLBL.y - Math.min(4, (t - TAPLBL.t0) / 60));
   g.restore();
+}
+// 名牌排布：按顺序放，和已经放下的名牌、气泡、按钮重叠就上下挪一挪，超出画面就往里推（碰撞按不带浮动的位置算，免得来回跳）
+function placeLabels(g, items, placed) {
+  const minX = -FARM.ox + 1, maxX = FARM.w - FARM.ox - 1;
+  for (const [text, cx, by, speech, bob = 0] of items) {
+    const w = textW(text) + 4, h = speech ? 10 : 9, x = Math.round(Math.max(minX, Math.min(maxX - w, cx - w / 2))), y0 = Math.round(by - h);
+    const dy = [0, -10, 10, -20, 20, -30].find(d => !placed.some(([px, py, pw, ph]) => x < px + pw && x + w > px && y0 + d < py + ph && y0 + d + h > py)) ?? 0;
+    placed.push([x, y0 + dy, w, h]); g.drawImage(labelSpr(text, speech && !dy), x, y0 + dy + bob);
+  }
 }
 function burst(x, y, col, n = 8, up = 1.2) { for (let i = 0; i < n; i++) PT.push({ x, y, vx: (Math.random() - .5) * 1.4, vy: -Math.random() * up - .3, g: .08, life: 18 + Math.random() * 10 | 0, col, s: 1 }); }
 function plotAt(lx, ly) {
@@ -1472,12 +1824,18 @@ function plotAt(lx, ly) {
   for (const k of order) { const q = PLOTS[k], p = S.plots[k]; if ((p.crop || p.dead) && Math.abs(lx - q.x) <= 12 && ly <= q.y && ly >= q.y - 46) return k; }
   return -1;
 }
-function fitFarm() { FARM.w = fitCanvas(farmCv, FARM.h, 172); FARM.ox = Math.floor((FARM.w - 180) / 2); }
+// 农场画布是高清的：画布像素 = 2 × 逻辑像素 = CSS 像素
+function fitFarm() {
+  const css = farmCv.parentElement.clientWidth || 320, W = Math.max(172, Math.floor(css / 2));
+  if (farmCv.width !== W * 2 || farmCv.height !== FARM.h * 2) { farmCv.width = W * 2; farmCv.height = FARM.h * 2; FG.imageSmoothingEnabled = false; }
+  farmCv.style.width = W * 2 + 'px'; farmCv.style.height = FARM.h * 2 + 'px';
+  FARM.w = W; FARM.ox = Math.floor((W - 180) / 2);
+}
 function onFarmTap(e) {
   ac(); unlockVoice();
   const r = farmCv.getBoundingClientRect(), lx = (e.clientX - r.left) * FARM.w / r.width - FARM.ox, ly = (e.clientY - r.top) * FARM.h / r.height;
-  if (Math.abs(lx - 166) < 10 && ly > 62 && ly < 82) return tapNest();
-  if (Math.abs(lx - HEN.x) < 8 && ly > 72 && ly < 87) return showWord('hen', HEN.x, 73);
+  if (Math.abs(lx - HEN.x) < 7 && ly > 55 && ly < 69) return showWord('hen', HEN.x, 54);   // 母鸡会走到窝前面，先判断它
+  if (Math.abs(lx - 44.5) < 10 && ly > 56 && ly < 70) return tapNest();
   const [px, py] = pathAt(DD.t);
   if (Math.abs(lx - px) < 10 && ly > py - 26 && ly < py + 3) { const line = DD_LINES[Math.floor(Math.random() * DD_LINES.length)]; DD.hop = 1; fx(line, px, py - 28, 'say'); say(line); return; }
   const k = plotAt(lx, ly); if (k >= 0) return tapPlot(k);
@@ -1489,13 +1847,13 @@ function onFarmTap(e) {
     if (s.w === 'mailbox' && S.q && S.q.list.some(q => q.n >= q.goal && !q.done)) { toast('信箱里有任务奖励可以领'); setTimeout(() => $('#quests').scrollIntoView({ behavior: 'smooth', block: 'center' }), 700); }
     return;
   }
-  const fenceY = lx < 90 ? 117 + (lx - 22) * .5 : 151 - (lx - 90) * .5;
-  if (lx > 22 && lx < 158 && Math.abs(ly - fenceY + 4) < 6) showWord('fence', lx, fenceY - 10);
+  const fenceY = lx < 68 ? 101 - (lx + 3) * 34 / 71 : 67 + (lx - 68) * 35 / 71;   // 菜地后面两条边
+  if (lx > -3 && lx < 139 && Math.abs(ly - fenceY + 6) < 7) showWord('fence', lx, fenceY - 13);
 }
 function tapNest() {
   if (S.nest.eggs > 0) {
-    const n = S.nest.eggs; S.nest.eggs = 0; addTo(S.inv, 'egg', n); quest('egg', n); gainXP(n); SFX.harvest(); fx(`+${n} 鸡蛋`, 166, 64); burst(166, 70, PAL.n0, 6); say('egg'); save(); refresh();
-  } else { showWord('nest', 166, 68); fx(`母鸡下蛋中 · ${fmtT((EGG_MS - S.nest.timer) / 1000)}`, 166, 56, 'info'); }
+    const n = S.nest.eggs; S.nest.eggs = 0; addTo(S.inv, 'egg', n); quest('egg', n); gainXP(n); SFX.harvest(); fx(`+${n} 鸡蛋`, 44, 54); burst(44, 62, PAL.n0, 6); say('egg'); save(); refresh();
+  } else { showWord('nest', 44, 58); fx(`母鸡下蛋中 · ${fmtT((EGG_MS - S.nest.timer) / 1000)}`, 44, 46, 'info'); }
 }
 function tapPlot(k) {
   const p = S.plots[k], q = PLOTS[k]; sel = k; selT = performance.now();
@@ -2166,7 +2524,7 @@ function boot() {
   $('#bSet').onclick = () => { ac(); openSettings(); };
   $('#bMap').innerHTML = icImg('map'); $('#bSet').innerHTML = icImg('gear');
   $('#bMap').onclick = () => { ac(); unlockVoice(); openMap(); };
-  const lb = $('#bLabels'), syncLb = () => { FARM.labels = !!S.cfg.labels; lb.setAttribute('aria-pressed', FARM.labels); lb.innerHTML = icImg('tag') + (FARM.labels ? '隐藏英文' : '英文标签'); };
+  const lb = $('#bLabels'), syncLb = () => { FARM.labels = !!S.cfg.labels; lb.setAttribute('aria-pressed', FARM.labels); lb.innerHTML = icImg('tag') + '标签'; };
   lb.onclick = () => { ac(); S.cfg.labels = !S.cfg.labels; save(); syncLb(); };
   syncLb();
   $('#stage').addEventListener('click', e => {
