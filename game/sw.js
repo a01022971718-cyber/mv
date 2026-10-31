@@ -1,6 +1,6 @@
 // 离线缓存：第一次联网打开后，游戏本体、发音包、识别程序都存进手机；之后断网也能打开。
 // 识别模型（.tar.gz）由识别库自己存进 IndexedDB，这里不经手。
-const V = 'doudou-v18';
+const V = 'doudou-v19';
 const CORE = ['./index.html', './voice.js', './vendor/vosk.js', './vendor/phaser.min.js', './art/skins/scarecrow-xmas.png', './art/skins/house-halloween.png', './art/skins/crop-pumpkin-spirit.png', './art/farm.webp', './art/farm-open.webp', './art/crop-sprout.png', './art/crop-bluebell.png'];
 // 图标和清单在有的托管服务上会被重定向，缓存失败也不影响离线游玩
 const EXTRA = ['./manifest.json', './icon-192.png', './icon-512.png'];
