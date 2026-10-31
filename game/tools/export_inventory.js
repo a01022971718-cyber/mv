@@ -12,7 +12,7 @@ const fs = require('fs');
   fs.writeFileSync(process.argv[2] + '/grammar.json', JSON.stringify(gram, null, 1));
   // 主屏幕图标：豆豆放大到 192 / 512，像素不插值（写到 game/ 下）
   for (const size of [192, 512]) {
-    const d = await p.evaluate(size => { const [c, g] = mk(size, size); g.fillStyle = '#7cc35a'; g.fillRect(0, 0, size, size); const s = Math.floor(size / 28); const sp = ddSpr('farm', 0); g.imageSmoothingEnabled = false; g.fillStyle = '#62ad4a'; for (let y = 0; y < size; y += s * 2) for (let x = (y / (s * 2)) % 2 * s; x < size; x += s * 2) g.fillRect(x, y, s, s); g.drawImage(sp, Math.round((size - sp.width * s) / 2), Math.round((size - sp.height * s) / 2 + s), sp.width * s, sp.height * s); return c.toDataURL(); }, size);
+    const d = await p.evaluate(size => { const [c, g] = mk(size, size); g.fillStyle = '#9aca42'; g.fillRect(0, 0, size, size); const s = Math.floor(size / 28); const sp = ddSpr('farm', 0); g.imageSmoothingEnabled = false; g.fillStyle = '#76aa2a'; for (let y = 0; y < size; y += s * 2) for (let x = (y / (s * 2)) % 2 * s; x < size; x += s * 2) g.fillRect(x, y, s, s); g.drawImage(sp, Math.round((size - sp.width * s) / 2), Math.round((size - sp.height * s) / 2 + s), sp.width * s, sp.height * s); return c.toDataURL(); }, size);
     fs.writeFileSync(require('path').resolve(__dirname, `../icon-${size}.png`), Buffer.from(d.split(',')[1], 'base64'));
   }
   const cnt = inv.reduce((a, x) => { const k = x.key.startsWith('w|') ? 'word' : x.voice; a[k] = (a[k] || 0) + 1; return a; }, {});

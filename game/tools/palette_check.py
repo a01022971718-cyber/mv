@@ -10,7 +10,7 @@
 """
 import cv2, numpy as np, json, sys, os
 PAL = json.load(open(os.path.join(os.path.dirname(__file__), '..', 'art', 'palette', 'palette.json')))
-hexs = [c for g in PAL['scene'] + PAL.get('ext', []) for c in g['colors']]
+hexs = [c for g in PAL['scene'] + PAL['ui'] for c in g['colors']]   # 整张色卡（场景 + 界面）
 OUTLINE = [hexs.index(c) for c in PAL['scene'][0]['colors']]   # 描边·暗部 组
 rgb = np.array([[int(h[i:i + 2], 16) for i in (1, 3, 5)] for h in hexs], np.uint8)
 tolab = lambda a: cv2.cvtColor((np.asarray(a, np.float32) / 255).reshape(-1, 1, 3)[..., ::-1], cv2.COLOR_BGR2LAB).reshape(-1, 3)
