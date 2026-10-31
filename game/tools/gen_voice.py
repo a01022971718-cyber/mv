@@ -23,6 +23,9 @@ def trim(x, sr):
     y = x[s:e].copy(); f = int(.01 * sr); y[:f] *= np.linspace(0, 1, f); y[-f:] *= np.linspace(1, 0, f)
     return y
 PHON = {'w|a': 'ɐ.'}  # 单读的 a 用句中的弱读，不读字母音 /eɪ/
+# 音标修正：多音词 tear 在做菜里是「撕」/ter/，Kokoro 默认读成「眼泪」/tɪr/；
+# 精灵的名字 Swirl 默认给出英式的 /swɜːl/，改成美式带 r 的 /swɜrl/
+FIX = [(r'\btear\b', 'tˈɪɹ', 'tˈɛɹ'), (r'\bswirl\b', 'swˈɜːl', 'swˈɜɹl')]
 items = [x for x in inv if not only or any(o in x['key'] for o in only)]
 for i, it in enumerate(items):
     name = hashlib.md5(it['key'].encode()).hexdigest()[:12]
@@ -34,9 +37,9 @@ for i, it in enumerate(items):
         out[it['key']] = base64.b64encode(mp3).decode(); it['wav'] = wav; it['dur'] = round(len(y) / sr, 2)
         continue
     ph = PHON.get(it['key'])
-    if ph is None and re.search(r'\btear\b', it['text'], re.I):
-        # 多音词：做菜里的 tear 是「撕」/ter/，Kokoro 默认读成「眼泪」/tɪr/
-        ph = k.tokenizer.phonemize(it['text'], 'en-us').replace('tˈɪɹ', 'tˈɛɹ')
+    for pat, a, b in FIX:
+        if ph is None and re.search(pat, it['text'], re.I):
+            ph = k.tokenizer.phonemize(it['text'], 'en-us').replace(a, b)
     if ph is not None: samples, sr = k.create(ph, voice=it['voice'], speed=it['speed'], lang='en-us', is_phonemes=True)
     else: samples, sr = k.create(it['text'], voice=it['voice'], speed=it['speed'], lang='en-us')
     y = trim(np.asarray(samples, dtype=np.float32), sr)
