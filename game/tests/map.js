@@ -6,7 +6,7 @@ const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || 
   const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 }); const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
   await p.clock.install({ time: new Date('2026-10-30T10:30:00') });
-  await p.goto(base); await p.waitForTimeout(1500);
+  await p.goto(base); await p.waitForTimeout(1500); await p.evaluate(() => { showArtReport = () => { }; });
   await p.evaluate(() => { document.querySelectorAll('.layer').forEach(l => l.remove()); S.intro = false; S.asrSkip = true; refresh(); });
   await p.locator('#bMap').click(); await p.waitForTimeout(900);
   await p.screenshot({ path: out + '/m1-world.png' });
@@ -65,7 +65,7 @@ const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || 
   await p.locator('.bd-lb[data-id="t-farm"]').click(); await p.waitForTimeout(300); await p.locator('[data-a=go]').click(); await p.waitForTimeout(500);
   console.log('after farm: layer open', await p.evaluate(() => !!MV.L), 'VIEW', await p.evaluate(() => VIEW), 'HERE', await p.evaluate(() => HERE));
   // 重新载入：改的东西都还在
-  await p.reload(); await p.waitForTimeout(1500);
+  await p.reload(); await p.waitForTimeout(1500); await p.evaluate(() => { showArtReport = () => { }; });
   await p.evaluate(() => { document.querySelectorAll('.layer').forEach(l => l.remove()); });
   await p.locator('#bMap').click(); await p.waitForTimeout(600); await p.locator('.bd-lb[data-id="w-trend"]').click(); await p.waitForTimeout(300); await p.locator('[data-a=go]').click(); await p.waitForTimeout(800);
   console.log('after reload:', await p.evaluate(() => [placeOf('t-home').name, placesOn('trend').length, !!document.querySelector('.bd-lb')]));

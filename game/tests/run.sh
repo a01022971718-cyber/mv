@@ -9,7 +9,7 @@ OUT=${1:-/tmp/doudou-tests}; mkdir -p "$OUT"
 python3 -m http.server 8765 --bind 127.0.0.1 --directory . > "$OUT/http.log" 2>&1 & echo $! > "$OUT/http.pid"
 for i in $(seq 200); do curl -s -o /dev/null http://127.0.0.1:8765/ && break; done
 fail=0
-for t in smoke newfeat spirits newcrop fx modes oldsave skins adjust map wardrobe systems toolkit offline; do
+for t in smoke newfeat spirits newcrop fx modes oldsave skins adjust map wardrobe systems toolkit learn offline; do
   printf '%-10s ' "$t"
   if timeout 400 node game/tests/$t.js "$OUT" > "$OUT/$t.log" 2>&1 && tail -3 "$OUT/$t.log" | grep -qi "errors none"; then echo ok; else echo FAIL; fail=1; tail -4 "$OUT/$t.log" | sed 's/^/    /'; fi
 done

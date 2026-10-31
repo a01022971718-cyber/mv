@@ -4,7 +4,7 @@ const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || 
 (async () => {
   const b = await chromium.launch(); const p = await (await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })).newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await p.goto('http://127.0.0.1:8765/game/index.html'); await p.waitForTimeout(1500);
+  await p.goto('http://127.0.0.1:8765/game/index.html'); await p.waitForTimeout(1500); await p.evaluate(() => { showArtReport = () => { }; });
   await p.evaluate(() => { document.querySelectorAll('.layer').forEach(l => l.remove()); S.intro = false; S.asrSkip = true; S.coins = 100; VOX.asked = true; refresh(); });   // 「下载语音包？」只问一次，测试里当作问过了
   const pickChoice = async label => { await p.locator('.layer .mp-opts [data-k]', { hasText: label }).first().click(); await p.waitForTimeout(150); };
   const fillAsk = async v => { await p.locator('.layer .inp').last().fill(v); await p.locator('.layer [data-a=ok]').last().click(); await p.waitForTimeout(150); };

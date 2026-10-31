@@ -5,7 +5,7 @@ const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || 
   const out = OUT, base = 'http://127.0.0.1:8765/game/index.html';
   const b = await chromium.launch(); const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, acceptDownloads: true }); const p = await ctx.newPage();
   const errs = []; p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await p.goto(base); await p.waitForTimeout(1500);
+  await p.goto(base); await p.waitForTimeout(1500); await p.evaluate(() => { showArtReport = () => { }; });
   await p.evaluate(() => { document.querySelectorAll('.layer').forEach(l => l.remove()); S.intro = false; S.asrSkip = true; S.lv = 4; [0, 1, 3].forEach(k => Object.assign(S.plots[k], { open: true, crop: 'tomato', prog: 1e9, dead: false, weeds: 0, bugs: 0, dry: false })); refresh(); });
   // 1. 主题：万圣节
   await p.locator('#bSkin').click(); await p.waitForTimeout(300);
@@ -55,7 +55,7 @@ const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || 
   await p.evaluate(async () => { delete S.cfg.bgs; S.cfg.bg = 'base'; S.cfg.myWords = []; save(); const db = await skinDB(); await new Promise(r => { const tx = db.transaction('imgs', 'readwrite'); tx.objectStore('imgs').clear(); tx.oncomplete = r; }); });
   await p.evaluate(() => { const i = document.createElement('input'); i.type = 'file'; i.id = 'pk'; document.body.append(i); });
   await p.setInputFiles('#pk', path);
-  const r = await p.evaluate(async () => importPack(document.getElementById('pk').files[0]));
+  const r = await p.evaluate(async () => importPack(document.getElementById('pk').files[0], { withSave: false }));
   console.log('import:', JSON.stringify(r), '| bg', await p.evaluate(() => curBg().id && curBg().custom), '| myWords', await p.evaluate(() => (S.cfg.myWords || []).length));
   console.log('ERRORS', errs.length ? errs : 'none'); await b.close();
 })();
