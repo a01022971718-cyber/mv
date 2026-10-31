@@ -43,7 +43,7 @@ const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || 
   // 5. 发音引擎：生成一个没录过的词
   await p.evaluate(() => { S.cfg.vox = 1; });
   const t0 = Date.now(); const ok = await p.evaluate(async () => { const u = await voxGen('graveyard party'); return !!u; }); console.log('vox gen:', ok, (Date.now() - t0) + 'ms', '| state', await p.evaluate(() => VOX.st));
-  const t1 = Date.now(); await p.evaluate(async () => { await voxGen('graveyard party'); }); console.log('vox cached:', (Date.now() - t1) + 'ms', '| stored', await p.evaluate(() => voxCount()));
+  const t1 = Date.now(); await p.evaluate(async () => { await voxGen('graveyard party'); }); console.log('vox cached:', (Date.now() - t1) + 'ms', '| stored', await p.evaluate(async () => (await voxKeys()).size));
   await p.evaluate(() => say('graveyard party')); await p.waitForTimeout(300); console.log('say uses:', (await p.evaluate(() => VO.el.src)).slice(0, 10));
   // 6. 词本：我加的
   await p.evaluate(() => go('words')); await p.locator('[data-f=mine]').click(); await p.waitForTimeout(200);
