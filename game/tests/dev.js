@@ -2,7 +2,7 @@
 const { chromium } = require('playwright');
 const GAME = require('path').resolve(__dirname, '..'), OUT = process.argv[2] || require('os').tmpdir(), fs = require('fs');
 // 引擎内部用的表（不是玩家的内容）。新加一张大写名字的表：是内容就写进 index.html 的 CONTENT_TABLES，是引擎内部的就写进这里
-const ENGINE = 'ASR ASR_MODELS BAYER BGIMG BGM BGM_DEF BK CD CONTR CROP_ART DD DEPTH DI DINER FARM FP GLYPH HEN HP IC IMG_URL ING_COL IT LV LVQ MIC MV NEED_ZH NEST NIGHT_TINT ONES OPEN_OFF OUTLINE_RGB PAL PALETTE PLANTFX PLOT_ORDER PT REG REG_PENDING REG_TOOLS SFX SFX_EV SKIN_ALPHA SKIN_IMG SKIN_THUMB SKY SNAP_WHY SPARK STAGE_ZH TAB_ICON TAPFX TENS TTS_TEXT UI VO VOX WORD_TTS ZOOMS FEATURES TABS CONTENT_TABLES CROPS0 SPR_ART'.split(' ');
+const ENGINE = 'ASR ASR_MODELS BAYER BGIMG BGM BGM_DEF BK CD CONTR CROP_ART DD DEPTH DI DINER FARM FP GLYPH HEN HP IC IMG_URL ING_COL IT LV LVQ MIC MV NEED_ZH NEST NIGHT_TINT ONES OPEN_OFF OUTLINE_RGB PAL PALETTE PLANTFX PLOT_ORDER PT REG REG_PENDING REG_TOOLS SFX SFX_EV SKIN_ALPHA SKIN_IMG SKIN_THUMB SKY SNAP_WHY SPARK STAGE_ZH TAB_ICON TAPFX TENS TTS_TEXT UI VO VOX WORD_TTS ZOOMS FEATURES TABS CONTENT_TABLES CROPS0 SPR_ART RECIPES0 CRITTERS0 TALK0 TALK_KINDS ACTS VOICES EARS PIC_IMG'.split(' ');
 (async () => {
   // 0. 漏登记检查：扫代码
   const html = fs.readFileSync(GAME + '/index.html', 'utf8'), tables = [...new Set([...html.matchAll(/^const ([A-Z][A-Z0-9_]+) = [\[{]/gm)].map(m => m[1]))];
@@ -19,7 +19,7 @@ const ENGINE = 'ASR ASR_MODELS BAYER BGIMG BGM BGM_DEF BK CD CONTR CROP_ART DD D
   await p.screenshot({ path: OUT + '/d1-dev.png' });
   // 2. 新加一种作物
   await p.locator('[data-reg=crops]').click(); await p.waitForTimeout(200); await p.locator('.layer [data-a=add]').last().click(); await p.waitForTimeout(200);
-  const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.locator('.pe [data-a=pic]').click()]); await fc.setFiles(GAME + '/art/crop-bluebell.png'); await p.waitForTimeout(1200);
+  const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.locator('.pe [data-pick=art]').click()]); await fc.setFiles(GAME + '/art/crop-bluebell.png'); await p.waitForTimeout(1200);
   await p.locator('.pe [data-k=zh]').fill('葡萄'); await p.locator('.pe [data-k=en]').fill('grape'); await p.locator('.pe [data-k=seed]').fill('5'); await p.locator('.pe [data-k=grow]').fill('30'); await p.locator('.pe [data-k=lv]').fill('1');
   await p.locator('.pe [data-k=sayEn]').fill('These grapes are purple.'); await p.locator('.pe [data-k=sayZh]').fill('这些葡萄是紫色的。');
   await p.locator('.pe [data-a=ok]').click(); await p.waitForTimeout(300);

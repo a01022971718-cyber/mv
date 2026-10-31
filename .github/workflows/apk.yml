@@ -1,9 +1,9 @@
 # 安卓安装包：开发者模式里「发布成 App」以后，自动把那个客户端打成 .apk，放到 GitHub 的 Releases 里（标签 apk-<客户端名>）。
-# 改了打包脚本或这个文件时，顺便打一个完整游戏的安装包（apk-dev）。也可以在 Actions 页面手动运行。
+# 每次发新版（version.json 变了）、或者改了打包脚本、这个文件时，打一个完整游戏的安装包（apk-dev）。也可以在 Actions 页面手动运行。
 name: 安卓安装包
 on:
   push:
-    paths: ['game/apps/*/game.json', 'game/tools/build_apk.sh', '.github/workflows/apk.yml']
+    paths: ['game/apps/*/game.json', 'game/tools/build_apk.sh', '.github/workflows/apk.yml', 'game/version.json']
   workflow_dispatch:
     inputs:
       app: { description: '客户端名字（game/apps 下的文件夹）；留空打包完整游戏', required: false, default: '' }
@@ -24,7 +24,7 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = workflow_dispatch ]; then A="${{ github.event.inputs.app }}"; [ -z "$A" ] && A=dev;
           else A=$(git diff --name-only HEAD~1 HEAD -- 'game/apps/*/game.json' | cut -d/ -f3 | sort -u | tr '\n' ' ');
-               git diff --name-only HEAD~1 HEAD | grep -qE '^(game/tools/build_apk.sh|.github/workflows/apk.yml)$' && A="$A dev"; fi
+               git diff --name-only HEAD~1 HEAD | grep -qE '^(game/tools/build_apk.sh|.github/workflows/apk.yml|game/version.json)$' && A="$A dev"; fi
           echo "apps=$(echo $A)" >> "$GITHUB_OUTPUT"; echo "要打包：$A"
       - name: 装工具
         run: sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick rsync >/dev/null
