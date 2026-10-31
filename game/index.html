@@ -2148,14 +2148,14 @@ async function checkUpdate(manual) {
   if (window.claude || location.protocol === 'file:') { if (manual) toast('这里的版本由 Claude 直接更新，不用检查'); return; }
   const v = await latestBuild();
   if (!v) { if (manual) toast('连不上 GitHub，稍后再试（离线也能照常玩）'); return; }
-  if (v.build > BUILD) offerUpdate(v); else if (manual) toast(`已经是最新版（第 ${BUILD} 版）`);
+  if (v.build > BUILD) { if (manual || S.cfg.skipBuild !== v.build) offerUpdate(v); } else if (manual) toast(`已经是最新版（第 ${BUILD} 版）`);
 }
 function offerUpdate(v) {
   if (document.querySelector('[data-upd]')) return;
   const node = h(`<div class="list" data-upd><h3>有新版本</h3><p class="lead">第 ${v.build} 版${v.note ? '：' + esc(v.note) : ''}<br>更新后进度、金币、单词成绩都保留。</p>
     <div class="row end"><button class="btn ghost" type="button" data-a="later">以后再说</button><button class="btn green" type="button" data-a="go">现在更新</button></div></div>`);
   const L = openLayer(node);
-  node.querySelector('[data-a=later]').onclick = () => L.close();
+  node.querySelector('[data-a=later]').onclick = () => { S.cfg.skipBuild = v.build; save(false); L.close(); };   // 这一版不再自动问，设置里还能手动更新
   node.querySelector('[data-a=go]').onclick = e => { e.target.disabled = true; e.target.textContent = '更新中…'; applyUpdate(); };
 }
 async function applyUpdate() {
@@ -2331,7 +2331,8 @@ function frame(t) {
 function setupPWA() {
   if (window.claude || !('serviceWorker' in navigator) || !window.isSecureContext || location.protocol === 'file:') return;
   if (/\/[0-9a-f]{40}\//.test(location.pathname)) return;   // githack 的固定提交地址只用来更新，不另装一份离线缓存
-  [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icon-192.png']].forEach(([rel, href]) => { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.append(l); });
+  // 清单用 .json：raw.githack 会把 .webmanifest 重定向到 raw.githubusercontent（跨域），浏览器就判定「无法安装」
+  [['manifest', 'manifest.json'], ['apple-touch-icon', 'icon-192.png']].forEach(([rel, href]) => { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.append(l); });
   navigator.serviceWorker.register('sw.js').catch(() => { });
 }
 function onResize() {

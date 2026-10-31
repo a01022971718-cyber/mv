@@ -1,0 +1,16 @@
+{
+  "name": "豆豆的田园厨房",
+  "short_name": "豆豆田园",
+  "description": "像素风小游戏：种菜、用英语口语做菜、用英语接待客人",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2b2230",
+  "theme_color": "#2b2230",
+  "lang": "zh-CN",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
