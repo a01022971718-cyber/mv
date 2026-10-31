@@ -16,12 +16,15 @@ description: 发布豆豆的田园厨房（game/）的新版本：改版本号�
 2. **改了中文文字** → `python3 game/tools/build_fonts.py`（只内联用到的字；没内联的字由完整字体按需补，不重做也能显示，但重做后首屏更快）。
 3. **改了游戏里的英文内容**（句子、单词、场景词）→ 用 `doudou-voice` 技能重做自带录音。玩家在游戏里自己加的英文不用管，手机上的发音引擎会生成。
 4. **跑全部测试**：`bash game/tests/run.sh /tmp/doudou-tests`，必须「全部通过」。新功能要在 `game/tests/` 里加测试，并加进 `run.sh` 的列表。
-5. **提交推送**到当前开发分支（见会话说明），提交信息写清楚做了什么。
+5. **提交推送**到当前开发分支（见会话说明），提交信息写清楚做了什么。推送前先 `git pull --rebase origin <分支>`：用户在开发者模式里「发布成 App」会直接往这个分支提交 `game/apps/`。
+   推送会触发 `.github/workflows/apk.yml`：改了 `game/apps/*/game.json` 打那个客户端的安卓安装包，改了打包脚本或流程文件时打完整游戏（apk-dev）。
 6. **确认上线**：轮询 `https://a01022971718-cyber.github.io/mv/game/version.json` 直到 build 变成 N（一般 1–2 分钟）。
 7. **更新预览页**（claude.ai 的 Artifact）：发布 `game/index.html`，`files` 里带上这次改过的素材（voice.js、新图片、version.json）。
 8. 告诉用户：手机上从桌面图标打开 → 点「更新」。
 
 ## 注意
+
+- 新加的内容表（大写名字的 `const XXX = [` / `{`）必须登记进 `CONTENT_TABLES`：能在开发者模式里改就加进 `REG`，有自己的编辑器就挂到 `REG_TOOLS`，暂时做不了就写进 `REG_PENDING`。`tests/dev.js` 会检查。
 
 - 不要在没准备好用户素材时先做；用户是美术新手、只有手机，说明用大白话。
 - 大文件（>50MB）只放发音引擎模型；其他素材尽量压成 webp。

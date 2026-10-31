@@ -2,12 +2,13 @@
 // 主线程发 {t:'init'} 或 {t:'say', id, text, voice, speed}；这里回 {t:'progress'}、{t:'ready'}、{t:'audio', id, pcm, sr}、{t:'error', id, msg}。
 // 模型第一次从本网站下载（约 92MB），之后存在浏览器缓存里，断网也能用。
 let tts = null, loading = null;
-function init() {
+function init(host) {
   if (tts) return Promise.resolve(tts);
   if (!loading) loading = (async () => {
-    self.KOKORO_HOST = new URL('./', self.location.href).href;   // 模型、声音都在 vendor/kokoro/ 下
+    const here = new URL('./', self.location.href).href;
+    self.KOKORO_HOST = host || here;   // 模型、声音默认在 vendor/kokoro/ 下；安卓安装包里从网站下载
     const m = await import('./kokoro.web.js');
-    m.env.wasmPaths = self.KOKORO_HOST;
+    m.env.wasmPaths = here;
     tts = await m.KokoroTTS.from_pretrained('onnx-community/Kokoro-82M-v1.0-ONNX', {
       dtype: 'q8', device: 'wasm',
       progress_callback: p => { if (p.status === 'progress' && p.total) postMessage({ t: 'progress', file: p.file, loaded: p.loaded, total: p.total }); },
@@ -20,7 +21,7 @@ function init() {
 self.onmessage = async e => {
   const d = e.data;
   try {
-    if (d.t === 'init') { await init(); return; }
+    if (d.t === 'init') { await init(d.host); return; }
     if (d.t === 'say') {
       const t = await init();
       const a = await t.generate(d.text, { voice: d.voice || 'af_heart', speed: d.speed || .92 });
