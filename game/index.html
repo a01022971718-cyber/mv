@@ -80,6 +80,7 @@ h2,h3{margin:0;text-wrap:balance}
 #stage::-webkit-scrollbar{display:none}
 .view{display:grid;gap:14px;align-content:start}
 .scene{position:relative;line-height:0;background:var(--bg2);overflow:hidden}
+.codebox{display:block;width:100%;min-height:110px;margin:6px 0;padding:8px;border:2px solid var(--ink);background:#fffdf6;color:var(--ink);font:13px/1.35 ui-monospace,monospace;word-break:break-all;resize:vertical}
 .scene .bgimg{position:absolute;left:0;top:0;height:384px;width:auto;max-width:none;pointer-events:none;user-select:none;-webkit-user-select:none}
 #farmCv{position:relative;touch-action:pan-y}
 canvas.cv{display:block;margin:0 auto;image-rendering:pixelated;image-rendering:crisp-edges;touch-action:manipulation}
@@ -2099,7 +2100,11 @@ function openSettings() {
     <p class="lead">示范发音是预先合成的标准美式发音，不需要联网。识别在手机本地运行，录音不会上传。</p>
     <div class="sec">存档</div>
     <p class="lead">存档保存在这台设备的浏览器里${CLOUD ? '，并同步到你的 Claude 账号' : ''}。已经说过 ${S.stats.spoken} 句英语，做过 ${S.stats.cook} 道菜，接待过 ${S.stats.serve} 位客人。</p>
+    <div class="row"><button class="btn" type="button" data-a="code-out">复制存档码</button><button class="btn" type="button" data-a="code-in">粘贴存档码</button></div>
+    <p class="lead">换手机、或者从旧图标搬到新地址时，用存档码把进度带过去。</p>
     <div class="row"><button class="btn red" type="button" data-a="reset">重新开始</button><span data-confirm hidden class="row"><span class="lead">进度会全部清空，确定吗？</span><button class="btn red" type="button" data-a="yes">确定清空</button></span></div>
+    <div class="sec">版本</div>
+    <div class="li"><span></span><span>第 ${BUILD} 版<br><span class="meta">${BUILD_DATE} · ${window.claude ? 'claude.ai 里的版本由 Claude 直接更新' : '联网时打开会自动检查新版本'}</span></span><button class="btn" type="button" data-a="upd">检查更新</button></div>
     <div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button></div></div>`);
   const L = openLayer(node, { onClose: () => ASR.subs.delete(draw) });
   function draw() {
@@ -2119,10 +2124,84 @@ function openSettings() {
     const m = e.target.closest('[data-m]'); if (m) { S.cfg.mode = m.dataset.m; save(); draw(); return; }
     if (e.target.closest('[data-a=asr]')) { loadASR().then(() => toast('离线识别准备好了'), () => toast('离线识别没准备好：' + asrErrText())); return; }
     if (e.target.closest('[data-a=asrdel]')) { try { if (ASR.model) ASR.model.terminate(); } catch (er) { } Object.assign(ASR, { model: null, loading: null, state: 'none' }); try { localStorage.removeItem(ASR_KEY); indexedDB.deleteDatabase('/vosk'); } catch (er) { } toast('已删除离线识别模型'); draw(); return; }
+    if (e.target.closest('[data-a=code-out]')) { openSaveCode(true); return; }
+    if (e.target.closest('[data-a=code-in]')) { openSaveCode(false); return; }
+    if (e.target.closest('[data-a=upd]')) { checkUpdate(true); return; }
     if (e.target.closest('[data-a=reset]')) { node.querySelector('[data-confirm]').hidden = false; return; }
     if (e.target.closest('[data-a=yes]')) { S = newGame(); S.intro = false; save(); L.close(); toast('已经重新开始'); return; }
     if (e.target.closest('[data-a=x]')) L.close();
   });
+}
+// ================= 版本、更新、存档码 =================
+// 每次发布把 BUILD 加一，同时改 game/version.json。打开游戏时去 GitHub 看最新版本号，有新的就问要不要更新；
+// 进度存在本机浏览器里，更新只换游戏本身，进度、金币、单词成绩都保留。
+const BUILD = 10, BUILD_DATE = '2026-10-31';
+const REPO = 'a01022971718-cyber/mv', BRANCH = 'ccr-17470247-hlo7zp';
+async function latestBuild() {
+  // 先问 GitHub API（没有 CDN 缓存），连不上再试 raw.githubusercontent
+  const src = [[`https://api.github.com/repos/${REPO}/contents/game/version.json?ref=${BRANCH}`, j => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\s/g, '')), c => c.charCodeAt(0))))],
+    [`https://raw.githubusercontent.com/${REPO}/${BRANCH}/game/version.json?t=${Date.now()}`, j => j]];
+  for (const [u, pick] of src) { try { const r = await fetch(u, { cache: 'no-store' }); if (r.ok) return pick(await r.json()); } catch (e) { } }
+  return null;
+}
+async function checkUpdate(manual) {
+  if (window.claude || location.protocol === 'file:') { if (manual) toast('这里的版本由 Claude 直接更新，不用检查'); return; }
+  const v = await latestBuild();
+  if (!v) { if (manual) toast('连不上 GitHub，稍后再试（离线也能照常玩）'); return; }
+  if (v.build > BUILD) offerUpdate(v); else if (manual) toast(`已经是最新版（第 ${BUILD} 版）`);
+}
+function offerUpdate(v) {
+  if (document.querySelector('[data-upd]')) return;
+  const node = h(`<div class="list" data-upd><h3>有新版本</h3><p class="lead">第 ${v.build} 版${v.note ? '：' + esc(v.note) : ''}<br>更新后进度、金币、单词成绩都保留。</p>
+    <div class="row end"><button class="btn ghost" type="button" data-a="later">以后再说</button><button class="btn green" type="button" data-a="go">现在更新</button></div></div>`);
+  const L = openLayer(node);
+  node.querySelector('[data-a=later]').onclick = () => L.close();
+  node.querySelector('[data-a=go]').onclick = e => { e.target.disabled = true; e.target.textContent = '更新中…'; applyUpdate(); };
+}
+async function applyUpdate() {
+  save(false);
+  try {
+    if (location.hostname === 'raw.githack.com') {
+      // githack 的分支地址会把旧文件缓存好几个小时；跳到最新提交的固定地址（同一个网站，存档共用）
+      const j = await (await fetch(`https://api.github.com/repos/${REPO}/commits/${BRANCH}`, { cache: 'no-store' })).json();
+      if (j.sha) { location.href = `https://raw.githack.com/${REPO}/${j.sha}/game/index.html`; return; }
+    }
+    const reg = navigator.serviceWorker && await navigator.serviceWorker.getRegistration(); if (reg) await reg.update();
+  } catch (e) { }
+  location.replace(location.pathname + '?v=' + Date.now());   // 带个参数，绕过浏览器缓存的旧页面
+}
+// 存档码：整份存档变成一串文字（DOUDOU1. 开头），在别处「粘贴存档码」就能把进度搬过去
+const SAVE_TAG = 'DOUDOU1.';
+function encodeSave(d) {
+  const b = new TextEncoder().encode(JSON.stringify(d)); let bin = '';
+  for (let i = 0; i < b.length; i += 8192) bin += String.fromCharCode.apply(null, b.subarray(i, i + 8192));
+  return SAVE_TAG + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodeSave(code) {
+  const m = String(code).match(/DOUDOU1\.([A-Za-z0-9_-]+)/); if (!m) return null;
+  try { const bin = atob(m[1].replace(/-/g, '+').replace(/_/g, '/')), d = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)))); return d && d.v === 1 && Array.isArray(d.plots) ? d : null; } catch (e) { return null; }
+}
+const saveSummary = d => `Lv ${d.lv} · 金币 ${d.coins} · 说过 ${(d.stats && d.stats.spoken) || 0} 句英语`;
+function openSaveCode(out) {
+  const code = out ? encodeSave(S) : '';
+  const node = h(`<div class="list"><h3>${out ? '复制存档码' : '粘贴存档码'}</h3>
+    <p class="lead">${out ? '把下面这串文字发到另一边（微信、备忘录都行），在那边的「设置 → 粘贴存档码」里贴进去，进度就搬过去了。' : '贴进从别处复制来的存档码。导入后，这里现在的进度会被替换。'}</p>
+    <textarea class="codebox" aria-label="存档码" ${out ? 'readonly' : 'placeholder="DOUDOU1.…"'}>${out ? code : ''}</textarea>
+    <p class="lead" data-info>${out ? '当前进度：' + saveSummary(S) : ''}</p>
+    <div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button><button class="btn green" type="button" data-a="${out ? 'copy' : 'imp'}">${out ? '复制' : '导入'}</button></div></div>`);
+  const L = openLayer(node), ta = node.querySelector('textarea'), info = node.querySelector('[data-info]');
+  node.querySelector('[data-a=x]').onclick = () => L.close();
+  if (out) node.querySelector('[data-a=copy]').onclick = async () => {
+    ta.select(); let ok = false;
+    try { await navigator.clipboard.writeText(code); ok = true; } catch (e) { try { ok = document.execCommand('copy'); } catch (e2) { } }
+    toast(ok ? '已复制存档码' : '没能自动复制，请长按文字全选后复制');
+  };
+  else node.querySelector('[data-a=imp]').onclick = e => {
+    const d = decodeSave(ta.value); if (!d) { info.textContent = '这串文字不是有效的存档码，看看是不是没复制完整。'; return; }
+    if (e.target.dataset.sure) { S = fixSave(d); S.last = Date.now(); save(); location.reload(); return; }
+    info.textContent = `要导入：${saveSummary(d)}。这里现在：${saveSummary(S)}。确定的话再点一次「确定导入」。`;
+    e.target.textContent = '确定导入'; e.target.dataset.sure = 1;
+  };
 }
 const LVQ = [];
 function levelUp(lv) { LVQ.push(lv); if (document.querySelector('.layer')) toast(`升到 Lv ${lv} 啦！`); setTimeout(flushLv, 350); }
@@ -2251,6 +2330,7 @@ function frame(t) {
 // 单独打开（GitHub Pages / githack）时：可安装到主屏幕，并用 Service Worker 离线缓存；在 claude.ai 里不启用
 function setupPWA() {
   if (window.claude || !('serviceWorker' in navigator) || !window.isSecureContext || location.protocol === 'file:') return;
+  if (/\/[0-9a-f]{40}\//.test(location.pathname)) return;   // githack 的固定提交地址只用来更新，不另装一份离线缓存
   [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icon-192.png']].forEach(([rel, href]) => { const l = document.createElement('link'); l.rel = rel; l.href = href; document.head.append(l); });
   navigator.serviceWorker.register('sw.js').catch(() => { });
 }
@@ -2304,6 +2384,7 @@ function boot() {
   loadVoicePack();
   if (asrSaved()) setTimeout(() => loadASR().catch(() => { }), 2500);
   setupPWA();
+  setTimeout(() => { if (navigator.onLine !== false) checkUpdate(false); }, 4000);
   setInterval(tick, 1000);
   requestAnimationFrame(frame);
   initCloud();
