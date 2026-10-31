@@ -263,7 +263,7 @@ canvas.cv{display:block;margin:0 auto;image-rendering:pixelated;image-rendering:
 
   <main id="stage">
     <section id="v-farm" class="view">
-      <div class="scene"><canvas id="farmCv" class="cv" aria-label="农场：点地块播种、照料和收获；点鸡窝捡蛋"></canvas><div id="farmFx" class="fx"></div><div id="seedHand" class="seedhand" hidden></div><div class="ovl"><button class="btn ghost" id="bLabels" type="button" aria-pressed="false" aria-label="显示所有英文标签"></button><button class="btn ghost" id="bSkin" type="button"></button></div></div>
+      <div class="scene"><canvas id="farmCv" class="cv" aria-label="农场：点地块播种、照料和收获；点鸡窝捡蛋"></canvas><div id="farmFx" class="fx"></div><div id="seedHand" class="seedhand" hidden></div><div id="adjBar" class="seedhand" hidden></div><div class="ovl"><button class="btn ghost" id="bLabels" type="button" aria-pressed="false" aria-label="显示所有英文标签"></button><button class="btn ghost" id="bSkin" type="button"></button></div></div>
       <div class="gut stack">
         <div id="farmStatus" class="status" aria-live="polite"></div>
         <div class="tools">
@@ -775,8 +775,8 @@ const QDEF = {
 // 地块 = 农场底图里的 16 块草格（4×4，tools/farm_plots.py 从两张底图量出来：c 是中心，q 是四个角，原图像素 ÷ 6 = 逻辑坐标）。
 // 0–5 号是后面两排，一开始就开垦好；6–15 号一块块花金币开垦。
 const IMG_PX = 6;
-const PLOT_IMG = [[653,  499], [792,  568], [931,  637], [486,  558], [631,  627], [773,  699], [1053,  711], [911,  773], [322,  618], [467,  689], [611,  762], [758,  842], [157,  676], [306,  759], [452,  834], [598,  911]];
-const PLOT_QUAD = [[[670, 426], [818, 499], [640, 563], [486, 488]], [[818, 499], [954, 567], [782, 633], [640, 563]], [[954, 567], [1079, 638], [917, 705], [782, 633]], [[486, 488], [640, 563], [476, 623], [320, 547]], [[640, 563], [782, 633], [621, 694], [476, 623]], [[782, 633], [917, 705], [763, 769], [621, 694]], [[1079, 638], [1201, 718], [1057, 785], [917, 705]], [[917, 705], [1057, 785], [917, 852], [763, 769]], [[320, 547], [476, 623], [313, 685], [154, 602]], [[476, 623], [621, 694], [459, 761], [313, 685]], [[621, 694], [763, 769], [605, 837], [459, 761]], [[763, 769], [917, 852], [764, 922], [605, 837]], [[154, 602], [313, 685], [136, 755], [-27, 658]], [[313, 685], [459, 761], [286, 837], [136, 755]], [[459, 761], [605, 837], [432, 913], [286, 837]], [[605, 837], [764, 922], [590, 994], [432, 913]]];
+const PLOT_IMG = [[657,  503], [798,  573], [937,  640], [488,  560], [637,  632], [781,  704], [1053,  715], [913,  778], [325,  620], [473,  694], [615,  766], [760,  844], [160,  681], [309,  762], [455,  837], [600,  913]];
+const PLOT_QUAD = [[[676, 430], [823, 504], [645, 567], [489, 490]], [[823, 504], [960, 571], [788, 637], [645, 567]], [[960, 571], [1081, 641], [921, 709], [788, 637]], [[489, 490], [645, 567], [481, 627], [321, 548]], [[645, 567], [788, 637], [627, 699], [481, 627]], [[788, 637], [921, 709], [767, 773], [627, 699]], [[1081, 641], [1197, 721], [1056, 789], [921, 709]], [[921, 709], [1056, 789], [917, 855], [767, 773]], [[321, 548], [481, 627], [317, 689], [157, 606]], [[481, 627], [627, 699], [463, 765], [317, 689]], [[627, 699], [767, 773], [608, 840], [463, 765]], [[767, 773], [917, 855], [764, 923], [608, 840]], [[157, 606], [317, 689], [139, 759], [-22, 667]], [[317, 689], [463, 765], [288, 840], [139, 759]], [[463, 765], [608, 840], [435, 915], [288, 840]], [[608, 840], [764, 923], [591, 995], [435, 915]]];
 const PLOTS = PLOT_IMG.map(([x, y]) => ({ x: x / IMG_PX, y: y / IMG_PX }));
 const PLOT_ORDER = [...PLOTS.keys()].sort((a, b) => PLOTS[a].y - PLOTS[b].y || PLOTS[a].x - PLOTS[b].x);
 
@@ -794,7 +794,7 @@ function newGame() {
   return {
     v: 1, t: 0, coins: 50, xp: 0, lv: 1, seeds: { lettuce: 3, carrot: 2, tomato: 2 }, inv: { egg: 1, lettuce: 2, tomato: 1 }, dishes: [], plots,
     nest: { eggs: 1, timer: 0 }, cust: [{ id: 1, who: 'mimi', dish: 'salad' }], custTimer: 30000, nextId: 2, words: {}, q: null,
-    cfg: { zh: true, talk: true, sfx: true, mode: 'auto', play: 'learn', skins: {} }, stats: { harvest: 0, cook: 0, serve: 0, spoken: 0, earned: 0 }, intro: true, asrSkip: false, last: Date.now(),
+    cfg: { zh: true, talk: true, sfx: true, mode: 'auto', play: 'learn', skins: {}, skinPos: {} }, stats: { harvest: 0, cook: 0, serve: 0, spoken: 0, earned: 0 }, intro: true, asrSkip: false, last: Date.now(),
   };
 }
 // 游戏模式：种菜、做菜、上菜都不强制开口，英文照常显示和播放，想说再点「开口说」；学习模式：现在的口语流程
@@ -1282,18 +1282,20 @@ function isoS(sx, sy) { return (x, y, z) => [sx + (x - y) * 2, sy + (x + y) - z]
 
 // ---- 场景里可以点的东西：点一下弹英文名牌并读出来（点哪儿学哪儿） ----
 const WORLD = [
-  { en: 'house', zh: '房子', ipa: '/haʊs/' }, { en: 'cake', zh: '蛋糕', ipa: '/keɪk/' }, { en: 'hen', zh: '母鸡', ipa: '/hen/' }, { en: 'nest', zh: '窝', ipa: '/nest/' },
-  { en: 'scarecrow', zh: '稻草人', ipa: '/ˈskerkroʊ/' }, { en: 'mailbox', zh: '信箱', ipa: '/ˈmeɪlbɑːks/' }, { en: 'mushroom', zh: '蘑菇', ipa: '/ˈmʌʃruːm/' },
-  { en: 'tree', zh: '树', ipa: '/triː/' }, { en: 'cherry tree', zh: '樱花树', ipa: '/ˈtʃeri triː/' }, { en: 'flowers', zh: '花', ipa: '/ˈflaʊərz/' }, { en: 'fence', zh: '栅栏', ipa: '/fens/' },
-  { en: 'mountain', zh: '山', ipa: '/ˈmaʊntn/' }, { en: 'sea', zh: '海', ipa: '/siː/' }, { en: 'fountain', zh: '喷泉', ipa: '/ˈfaʊntn/' }, { en: 'gingerbread man', zh: '姜饼人', ipa: '/ˈdʒɪndʒərbred mæn/' },
+  { en: 'house', zh: '房子', ipa: '/haʊs/' }, { en: 'scarecrow', zh: '稻草人', ipa: '/ˈskerkroʊ/' }, { en: 'fountain', zh: '喷泉', ipa: '/ˈfaʊntn/' }, { en: 'mailbox', zh: '信箱', ipa: '/ˈmeɪlbɑːks/' },
+  { en: 'hen', zh: '母鸡', ipa: '/hen/' }, { en: 'nest', zh: '窝', ipa: '/nest/' }, { en: 'fence', zh: '栅栏', ipa: '/fens/' }, { en: 'flowers', zh: '花', ipa: '/ˈflaʊərz/' },
+  { en: 'bush', zh: '灌木丛', ipa: '/bʊʃ/' }, { en: 'path', zh: '小路', ipa: '/pæθ/' }, { en: 'hill', zh: '小山坡', ipa: '/hɪl/' }, { en: 'cottage', zh: '小屋', ipa: '/ˈkɑːtɪdʒ/' },
+  { en: 'cloud', zh: '云', ipa: '/klaʊd/' }, { en: 'sea', zh: '海', ipa: '/siː/' }, { en: 'mountain', zh: '山', ipa: '/ˈmaʊntn/' },
 ];
-// 热区：原图像素里的矩形 [x, y, 宽, 高] 和名牌位置（名牌底边中点），用的时候 ÷6 变逻辑坐标；小的、叠在别的上面的排前面（先查地块，再查这里）
+// 热区：原图像素里的矩形 [x, y, 宽, 高] 和名牌位置（名牌底边中点），用的时候 ÷6 变逻辑坐标；小的、叠在别的上面的排前面
+// （先查地块、装扮物件，再查这里；稻草人、房子、喷泉、信箱是装扮，按装扮图的范围判断）
 const SPOTS = [
-  ['gingerbread man', [1880, 585, 95, 100], [1927, 583]], ['fountain', [1730, 570, 290, 160], [1860, 568]], ['strawberry', [1420, 40, 130, 115], [1485, 40]],
-  ['mushroom', [1630, 870, 130, 80], [1695, 868]], ['mailbox', [1640, 950, 115, 150], [1697, 1110]],
-  ['scarecrow', [1020, 240, 190, 280], [1115, 238]], ['cherry tree', [440, 150, 240, 290], [560, 150]], ['tree', [690, 170, 320, 330], [850, 172]],
-  ['flowers', [50, 470, 160, 130], [130, 468]], ['fence', [200, 370, 340, 170], [330, 375]], ['fence', [1600, 700, 448, 240], null], ['fence', [760, 430, 290, 170], null],
-  ['cake', [1300, 150, 330, 300], [1465, 165]], ['house', [1280, 40, 740, 690], [1470, 600]], ['sea', [0, 300, 430, 120], [200, 330]], ['mountain', [0, 180, 1290, 120], null],
+  ['cottage', [1270, 120, 140, 115], [1340, 118]], ['flowers', [40, 480, 190, 120], [135, 478]],
+  ['cloud', [20, 80, 370, 130], [205, 80]], ['cloud', [440, 50, 330, 120], null], ['cloud', [890, 130, 190, 60], null], ['cloud', [1570, 150, 100, 70], null],
+  ['bush', [1750, 200, 298, 400], [1900, 200]], ['bush', [0, 370, 180, 120], null],
+  ['fence', [150, 340, 510, 130], [400, 340]], ['fence', [640, 320, 570, 280], null], ['sea', [0, 260, 700, 120], [330, 280]],
+  ['path', [1080, 300, 360, 360], [1260, 420]], ['path', [900, 660, 1148, 492], null], ['hill', [1150, 215, 380, 130], [1300, 222]],
+  ['mountain', [0, 160, 2048, 140], null],
 ].map(([w, r, l]) => ({ w, r: r.map(v => v / IMG_PX), lx: l ? l[0] / IMG_PX : 0, ly: l ? l[1] / IMG_PX : 0, noLabel: !l }));
 function showWord(w, x, y) { TAPLBL = { w, x, y, t0: performance.now() }; say(w); }
 
@@ -1483,7 +1485,6 @@ const hdCrop = (id, st, f = 0) => hdUp(`crop:${id}:${st}:${st === 3 ? f : 0}`, (
 // 比例：原画里的角色比我们的像素精灵大一圈，作物、母鸡放大 1.25 倍，豆豆 1.5 倍（按脚底中点放大）
 const K_CROP = 1.25, K_HEN = 1.25, K_DD = 1.5;
 const NEST = { x: 25, y: 148 };   // 菜地左下的草地上
-const HOUSE_GLOW = [[1482, 562, 72, 52], [1855, 495, 22, 30]];   // 蛋糕屋的门口和右边小窗（原图像素：中心、半径），夜里亮灯
 const panArrow = dir => spr('panarrow:' + dir, () => sprite(5, 9, g => { for (let i = 0; i < 5; i++) R(g, dir > 0 ? i : 4 - i, i, 1, 9 - 2 * i, PAL.n0); }));
 // 画面顺序：底图 → 开垦的地块 → 作物 → 鸡窝、母鸡 → 夜色 → 豆豆（夜里只略暗）→ 气泡和名牌 → 左右拖动的提示箭头
 // ================= 农场画面：Phaser 引擎 =================
@@ -1589,7 +1590,11 @@ function farmSync(t) {
     for (let b = 0; b < p.bugs; b++) { const a = t / 700 + k + b * 3, bx = Math.round(q.x + Math.cos(a) * 11), by = Math.round(q.y + Math.sin(a) * 4), f = (t / 150 | 0) % 2; px(gx, bx - 1, by - 1, 4, 3, C.ink); px(gx, bx, by, 2, 1, PAL.r1); px(gx, bx + (f ? -2 : 3), by + 1, 1, 1, C.ink); px(gx, bx + (f ? 3 : -2), by, 1, 1, C.ink); }
   }
   // 装扮物件（稻草人、房子……）
-  SKIN_SLOTS.forEach(sl => { if (sl.kind !== 'prop') return; const id = skinOn(sl.id); if (id && FS.textures.exists(skinKey(id))) FP.img(skinKey(id)).setOrigin(.5, 1).setPosition(sl.anchor[0] / IMG_PX, sl.anchor[1] / IMG_PX).setScale(1 / IMG_PX).setDepth(DEPTH.world + sl.anchor[1] / IMG_PX); });
+  SKIN_SLOTS.forEach(sl => {
+    if (sl.kind !== 'prop') return; const id = skinOn(sl.id); if (!id || !FS.textures.exists(skinKey(id))) return;
+    const q = skinPlace(sl, id); FP.img(skinKey(id)).setOrigin(.5, 1).setPosition(q.x, q.y).setScale(q.k / IMG_PX).setDepth(DEPTH.world + q.y);
+    if (FARM.adjust && FARM.adjust.slot === sl.id) { const b = skinBounds(sl, id); if (b) gx.lineStyle(1, 0xfad864, .5 + .4 * Math.sin(t / 200)).strokeRect(b.x, b.y, b.w, b.h); }
+  });
   // 鸡窝、鸡蛋、母鸡
   sh(NEST.x, NEST.y + 2, 9, 2.2); FP.can(nestHD()).setPosition(NEST.x - 8.5, NEST.y - 4).setScale(.5).setDepth(DEPTH.world + NEST.y);
   for (let i = 0; i < S.nest.eggs; i++) FP.can(eggHD()).setPosition(NEST.x - 6 + i * 3.5, NEST.y - 7).setScale(.5).setDepth(DEPTH.world + NEST.y + .1);
@@ -1613,10 +1618,6 @@ function farmSync(t) {
   for (let i = PT.length - 1; i >= 0; i--) { const p = PT[i]; p.x += p.vx; p.y += p.vy; p.vy += p.g; if (--p.life <= 0) { PT.splice(i, 1); continue; } px(gx, p.x, p.y, p.s, p.s, p.col); }
   // 夜色只压在场景上；灯光、萤火虫、豆豆在夜色上面
   if (ph !== 'day') { const m = NIGHT_TINT[ph].match(/[\d.]+/g).map(Number); gt.fillStyle((m[0] << 16) | (m[1] << 8) | m[2], m[3]).fillRect(0, 0, W, FARM.h); }
-  if (night && !skinOn('house')) {
-    HOUSE_GLOW.forEach(([x, y, rx, ry]) => { gl.fillStyle(0xe6b700, .28).fillEllipse(x / IMG_PX, y / IMG_PX, rx / IMG_PX * 3, ry / IMG_PX * 3); gl.fillStyle(0xfff2bf, .55).fillEllipse(x / IMG_PX, y / IMG_PX, rx / IMG_PX * 2, ry / IMG_PX * 2); });
-    for (let i = 0; i < 26; i++) { const a = hash(i) * 6.28, r = 3 + hash(i + 7) * 9; if ((i + (t / 300 | 0)) % 5) px(gl, 247 + Math.cos(a) * r * 2, 102 + Math.sin(a) * r * .8, 1, 1, PAL.y0); }
-  }
   if (ph === 'night') for (let i = 0; i < 6; i++) { const fx2 = 20 + hash(i) * 150 + Math.sin(t / 900 + i) * 6, fy = 70 + hash(i + 9) * 60 + Math.cos(t / 700 + i * 2) * 4; if (Math.sin(t / 400 + i * 1.7) > -.2) px(gl, fx2, fy, 1, 1, PAL.y0); }
   if (t > DD.next && Math.abs(DD.tt - DD.t) < .004) { DD.tt = .06 + Math.random() * .88; DD.next = t + 3000 + Math.random() * 5000; }
   const mv = Math.abs(DD.tt - DD.t) >= .004; if (mv) { DD.face = DD.tt > DD.t ? 1 : -1; DD.t += DD.face * .0034; }
@@ -1638,7 +1639,10 @@ function farmSync(t) {
     }
     if (n && n !== 'ripe') { const bx = q.x - 7 + (talk ? Math.ceil(textW(talk) / 2) + 10 : 0), by = q.y - top - 6; FP.can(bubSpr(n)).setPosition(bx, by + bob).setDepth(DEPTH.ui); placed.push([bx, by, 14, 15]); }
   }
-  if (FARM.labels) { SPOTS.forEach(s => { if (!s.noLabel) items.push([s.w, s.lx, s.ly]); }); items.push(['hen', HEN.x, HEN.y - 18], ['nest', NEST.x, NEST.y + 11]); }
+  if (FARM.labels) {
+    SPOTS.forEach(s => { if (!s.noLabel) items.push([s.w, s.lx, s.ly]); }); items.push(['hen', HEN.x, HEN.y - 18], ['nest', NEST.x, NEST.y + 11]);
+    SKIN_SLOTS.forEach(sl => { const id = sl.kind === 'prop' && skinOn(sl.id), b = id && skinBounds(sl, id); if (b) items.push([sl.word, b.cx, b.top + 2]); });
+  }
   const minX = -ox + 1, maxX = W - ox - 1;   // 名牌排布：和已经放下的名牌、气泡重叠就上下挪一挪，超出画面就往里推
   for (const [text, cx, by, speech, bob = 0] of items) {
     if (cx < minX - 8 || cx > maxX + 8) continue;
@@ -1667,10 +1671,12 @@ function startFarmEngine() {
 
 // ================= 装扮：场景物件和作物的样子可以换 =================
 // 装扮位：prop = 场景物件（anchor 是脚底中点、box 是最大宽高，都按农场原画像素）；crop = 作物（换长大和成熟时的样子）。
-// painted：这个物件现在还画在底图里，换成别的会从后面露出来；美术交了去掉它的干净底图后改成 false。
+// def：没选的时候用哪个装扮（底图里已经没有这些东西了）；没有 def 的位置默认空着。规格见 ART.md
 const SKIN_SLOTS = [
-  { id: 'scarecrow', zh: '稻草人', word: 'scarecrow', kind: 'prop', anchor: [1115, 525], box: [300, 330], painted: true, rect: [1020, 240, 190, 280] },
-  { id: 'house', zh: '房子', word: 'house', kind: 'prop', anchor: [1650, 735], box: [720, 700], painted: true, rect: [1280, 40, 740, 690] },
+  { id: 'scarecrow', zh: '稻草人', word: 'scarecrow', kind: 'prop', anchor: [1122, 545], box: [300, 360], def: 'xmas' },
+  { id: 'house', zh: '房子', word: 'house', kind: 'prop', anchor: [1650, 735], box: [800, 950], def: 'halloween' },
+  { id: 'fountain', zh: '喷泉', word: 'fountain', kind: 'prop', anchor: [1876, 737], box: [320, 200] },
+  { id: 'mailbox', zh: '信箱', word: 'mailbox', kind: 'prop', anchor: [1697, 1110], box: [160, 260] },
   ...CROP_IDS.map(id => ({ id: 'crop:' + id, zh: CROPS[id].zh, word: CROPS[id].en, kind: 'crop', crop: id, box: [240, 210] })),
 ];
 // 自带的装扮（art/skins/，用 tools/skin_prep.py 处理过）；上传的装扮也加进这个表（up: true）
@@ -1681,7 +1687,22 @@ const SKINS = [
 ];
 const SKIN_IMG = {};
 const skinKey = id => 'skin:' + id;
-const skinOn = slot => { const id = S && S.cfg.skins && S.cfg.skins[slot]; return id && SKINS.some(s => s.id === id && s.slot === slot) ? id : null; };
+const SLOT = Object.fromEntries(SKIN_SLOTS.map(s => [s.id, s]));
+// 这个位置现在用哪个装扮：自己选的 > 默认的；选了「不放」就是空
+const skinOn = slot => { const id = S && S.cfg.skins && S.cfg.skins[slot]; if (id === 'none') return null; if (id && SKINS.some(s => s.id === id && s.slot === slot)) return id; return (SLOT[slot] && SLOT[slot].def) || null; };
+// 物件摆在哪：脚底锚点 + 在游戏里拖动调过的偏移和大小（S.cfg.skinPos，按装扮分开记）
+function skinPlace(sl, id) { const p = (S.cfg.skinPos && S.cfg.skinPos[id]) || {}; return { x: (sl.anchor[0] + (p.dx || 0)) / IMG_PX, y: (sl.anchor[1] + (p.dy || 0)) / IMG_PX, k: p.s || 1 }; }
+// 点到的是不是装扮图里不透明的地方（透明的空隙点下去，算点到后面的东西）；读不了像素时（本地文件打开）按整个方框算
+const SKIN_ALPHA = {};
+function skinHit(id, u, v) {
+  const img = SKIN_IMG[id]; let a = SKIN_ALPHA[id];
+  if (a === undefined) { try { const [c, g] = mk(img.naturalWidth, img.naturalHeight); g.drawImage(img, 0, 0); a = { w: c.width, h: c.height, d: g.getImageData(0, 0, c.width, c.height).data }; } catch (e) { a = null; } SKIN_ALPHA[id] = a; }
+  if (!a) return true;
+  const x = Math.min(a.w - 1, Math.max(0, u * a.w | 0)), y = Math.min(a.h - 1, Math.max(0, v * a.h | 0));
+  for (let dy = -6; dy <= 6; dy += 3) for (let dx = -6; dx <= 6; dx += 3) { const xx = x + dx, yy = y + dy; if (xx >= 0 && yy >= 0 && xx < a.w && yy < a.h && a.d[(yy * a.w + xx) * 4 + 3] > 0) return true; }   // 手指不准，周围几个像素也算
+  return false;
+}
+function skinBounds(sl, id) { const img = SKIN_IMG[id]; if (!img || !img.naturalWidth) return null; const q = skinPlace(sl, id), w = img.naturalWidth / IMG_PX * q.k, h = img.naturalHeight / IMG_PX * q.k; return { x: q.x - w / 2, y: q.y - h, w, h, cx: q.x, top: q.y - h }; }
 const skinSrc = slot => { const id = skinOn(slot), s = id && SKINS.find(x => x.id === id); return s ? s.src || s.data : null; };
 function addSkinTex(id) { const img = SKIN_IMG[id]; if (FS && img && img.naturalWidth && !FS.textures.exists(skinKey(id))) FS.textures.addImage(skinKey(id), img); }
 function loadSkinImg(s) { if (SKIN_IMG[s.id]) return; const img = new Image(); SKIN_IMG[s.id] = img; img.addEventListener('load', () => addSkinTex(s.id), { once: true }); img.src = s.src || s.data; }
@@ -1720,14 +1741,26 @@ async function processSkin(file, slot) {
     return out.toDataURL('image/png');
   } finally { URL.revokeObjectURL(url); }
 }
-// 装扮窗口里「原样」那一格的缩略图：场景物件从底图里截，作物用现在的样子
+// 装扮窗口里作物「原样」那一格的缩略图：现在的样子
 const SKIN_THUMB = {};
-function defaultThumb(sl) {
-  if (SKIN_THUMB[sl.id]) return SKIN_THUMB[sl.id];
-  if (sl.kind === 'crop') return SKIN_THUMB[sl.id] = CROPS[sl.crop].art || hdCrop(sl.crop, 3, 0).toDataURL();
-  if (!FARM_IMG.naturalWidth) return '';
-  const [x, y, w, h] = sl.rect, [c, g] = mk(w, h); g.drawImage(FARM_IMG, x, y, w, h, 0, 0, w, h);
-  try { return SKIN_THUMB[sl.id] = c.toDataURL(); } catch (e) { return ''; }   // 本地文件打开时浏览器不让读，缩略图就空着
+const cropThumb = sl => SKIN_THUMB[sl.id] || (SKIN_THUMB[sl.id] = CROPS[sl.crop].art || hdCrop(sl.crop, 3, 0).toDataURL());
+// 调整位置：在农场上用手指拖动物件，按钮放大缩小；按装扮分开记住
+function startAdjust(slot) {
+  const id = skinOn(slot); if (!id) return;
+  FARM.adjust = { slot, id }; if (VIEW !== 'farm') go('farm');
+  setCam(SLOT[slot].anchor[0] / IMG_PX - FARM.w / 2); farmCv.style.touchAction = 'none';   // 调整时上下拖也是移动物件，不滚动页面
+  syncAdjBar();
+}
+function adjPos() { const a = FARM.adjust; S.cfg.skinPos = S.cfg.skinPos || {}; return S.cfg.skinPos[a.id] || (S.cfg.skinPos[a.id] = { dx: 0, dy: 0, s: 1 }); }
+function syncAdjBar() {
+  const el = $('#adjBar'), a = FARM.adjust; el.hidden = !a || VIEW !== 'farm'; if (el.hidden) return;
+  el.innerHTML = `<span>拖动${SLOT[a.slot].zh}</span><button class="btn" type="button" data-k="-">缩小</button><button class="btn" type="button" data-k="+">放大</button><button class="btn ghost" type="button" data-k="0">还原</button><button class="btn green" type="button" data-k="ok">完成</button>`;
+  el.onclick = e => {
+    const b = e.target.closest('[data-k]'); if (!b || !FARM.adjust) return; const k = b.dataset.k, p = adjPos();
+    if (k === '-') p.s = Math.max(.4, +(p.s / 1.1).toFixed(3)); else if (k === '+') p.s = Math.min(2.5, +(p.s * 1.1).toFixed(3));
+    else if (k === '0') { delete S.cfg.skinPos[FARM.adjust.id]; } else if (k === 'ok') { FARM.adjust = null; farmCv.style.touchAction = ''; toast('位置记住了'); }
+    save(); syncAdjBar();
+  };
 }
 function openWardrobe() {
   const node = h(`<div class="list wardrobe"><h3>装扮</h3>
@@ -1735,10 +1768,14 @@ function openWardrobe() {
     <div data-w></div><input type="file" accept="image/*" hidden data-file>
     <div class="row end"><button class="btn ghost" type="button" data-a="x">关闭</button></div></div>`);
   const L = openLayer(node), file = node.querySelector('[data-file]'); let upSlot = null;
-  const tile = (sl, s) => { const on = s ? skinOn(sl.id) === s.id : !skinOn(sl.id); return `<button type="button" class="skt" data-slot="${sl.id}" data-skin="${s ? s.id : ''}" aria-pressed="${on}"><img src="${s ? esc(s.src || s.data) : defaultThumb(sl)}" alt=""><span>${s ? esc(s.zh) : '原样'}</span>${s && s.up ? `<i data-del="${s.id}" role="button" aria-label="删除 ${esc(s.zh)}">×</i>` : ''}</button>`; };
-  const row = sl => `<div class="skrow"><div class="skh"><b>${sl.zh}</b> <span class="en">${sl.word}</span></div>
-    <div class="sks">${tile(sl, null)}${SKINS.filter(s => s.slot === sl.id).map(s => tile(sl, s)).join('')}<button type="button" class="skt up" data-up="${sl.id}"><b>＋</b><span>上传</span></button></div>
-    ${sl.painted && skinOn(sl.id) ? `<p class="meta">底图里还画着原来的${sl.zh}，所以会从后面露出来；美术交了去掉${sl.zh}的干净底图后就好了。</p>` : ''}</div>`;
+  // 第一格：场景物件是「不放」，作物是「原样」（代码画的样子）
+  const tile = (sl, s) => {
+    const on = s ? skinOn(sl.id) === s.id : !skinOn(sl.id), prop = sl.kind === 'prop';
+    const pic = s ? `<img src="${esc(s.src || s.data)}" alt="">` : prop ? '<b>－</b>' : `<img src="${cropThumb(sl)}" alt="">`;
+    return `<button type="button" class="skt${s || !prop ? '' : ' up'}" data-slot="${sl.id}" data-skin="${s ? s.id : prop ? 'none' : ''}" aria-pressed="${on}">${pic}<span>${s ? esc(s.zh) : prop ? '不放' : '原样'}</span>${s && s.up ? `<i data-del="${s.id}" role="button" aria-label="删除 ${esc(s.zh)}">×</i>` : ''}</button>`;
+  };
+  const row = sl => `<div class="skrow"><div class="skh"><b>${sl.zh}</b> <span class="en">${sl.word}</span>${sl.kind === 'prop' && skinOn(sl.id) ? ` <button type="button" class="link" data-adj="${sl.id}">调整位置和大小</button>` : ''}</div>
+    <div class="sks">${tile(sl, null)}${SKINS.filter(s => s.slot === sl.id).map(s => tile(sl, s)).join('')}<button type="button" class="skt up" data-up="${sl.id}"><b>＋</b><span>上传</span></button></div></div>`;
   const draw = () => { node.querySelector('[data-w]').innerHTML = `<div class="sec">场景</div>${SKIN_SLOTS.filter(s => s.kind === 'prop').map(row).join('')}<div class="sec">作物（换长大和成熟时的样子）</div>${SKIN_SLOTS.filter(s => s.kind === 'crop').map(row).join('')}`; };
   draw();
   node.addEventListener('click', async e => {
@@ -1747,6 +1784,7 @@ function openWardrobe() {
     const t = e.target.closest('[data-skin]');
     if (t) { S.cfg.skins = S.cfg.skins || {}; if (t.dataset.skin) S.cfg.skins[t.dataset.slot] = t.dataset.skin; else delete S.cfg.skins[t.dataset.slot]; save(); refresh(); draw(); SFX.click(); return; }
     const up = e.target.closest('[data-up]'); if (up) { upSlot = up.dataset.up; file.value = ''; file.click(); return; }
+    const adj = e.target.closest('[data-adj]'); if (adj) { L.close(); startAdjust(adj.dataset.adj); return; }
     if (e.target.closest('[data-a=x]')) L.close();
   });
   file.addEventListener('change', async () => {
@@ -1770,14 +1808,19 @@ function setCam(c) {
 }
 // 左右拖动看整张图；拖过的那一下不算点击。竖着滑照常滚动页面（touch-action: pan-y）
 function bindFarmPan() {
-  farmCv.addEventListener('pointerdown', e => { FARM.drag = { x: e.clientX, cam: FARM.cam, id: e.pointerId, moved: false }; });
+  farmCv.addEventListener('pointerdown', e => { FARM.drag = { x: e.clientX, y: e.clientY, cam: FARM.cam, id: e.pointerId, moved: false, adj: FARM.adjust ? { ...adjPos() } : null }; });
   farmCv.addEventListener('pointermove', e => {
     const d = FARM.drag; if (!d || d.id !== e.pointerId) return;
-    const dx = e.clientX - d.x;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (d.adj) {   // 调整装扮位置：1 个 CSS 像素 = 半个逻辑像素 = 3 个原画像素
+      if (!d.moved && Math.hypot(dx, dy) > 4) { d.moved = true; try { farmCv.setPointerCapture(e.pointerId); } catch (_) { } }
+      if (d.moved && FARM.adjust) { const p = adjPos(); p.dx = Math.round(d.adj.dx + dx * 3); p.dy = Math.round(d.adj.dy + dy * 3); }
+      return;
+    }
     if (!d.moved && Math.abs(dx) > 8) { d.moved = true; try { farmCv.setPointerCapture(e.pointerId); } catch (_) { } }
     if (d.moved) setCam(d.cam - dx / 2);
   });
-  const end = () => { if (FARM.drag && FARM.drag.moved) FARM.noClick = performance.now(); FARM.drag = null; };
+  const end = () => { if (FARM.drag && FARM.drag.moved) { FARM.noClick = performance.now(); if (FARM.drag.adj) save(); } FARM.drag = null; };
   farmCv.addEventListener('pointerup', end); farmCv.addEventListener('pointercancel', end);
   farmCv.addEventListener('wheel', e => { const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0; if (d) { e.preventDefault(); setCam(FARM.cam + d / 2); } }, { passive: false });
 }
@@ -1796,7 +1839,7 @@ function fitFarm() {
   FARM.w = W; setCam(FARM.cam);
 }
 function onFarmTap(e) {
-  if (performance.now() - (FARM.noClick || 0) < 350) return;   // 刚拖完画面
+  if (FARM.adjust || performance.now() - (FARM.noClick || 0) < 350) return;   // 正在调整装扮位置，或者刚拖完画面
   ac(); unlockVoice();
   const r = farmCv.getBoundingClientRect(), lx = (e.clientX - r.left) * FARM.w / r.width - FARM.ox, ly = (e.clientY - r.top) * FARM.h / r.height;
   if (Math.abs(lx - HEN.x) < 8 && ly > HEN.y - 18 && ly < HEN.y + 2) return showWord('hen', HEN.x, HEN.y - 18);   // 母鸡会走到窝前面，先判断它
@@ -1804,10 +1847,9 @@ function onFarmTap(e) {
   const [px, py] = pathAt(DD.t);
   if (Math.abs(lx - px) < 14 && ly > py - 38 && ly < py + 3) { const line = DD_LINES[Math.floor(Math.random() * DD_LINES.length)]; DD.hop = 1; clearSay(); fx(line, px, py - 40, 'say'); say(line); return; }
   const k = plotAt(lx, ly); if (k >= 0) return tapPlot(k);
-  for (const sl of SKIN_SLOTS) {   // 换了装扮的物件：按新图的范围判断
-    const id = sl.kind === 'prop' && skinOn(sl.id), img = id && SKIN_IMG[id]; if (!img || !img.naturalWidth) continue;
-    const w = img.naturalWidth / IMG_PX, hh = img.naturalHeight / IMG_PX, ax = sl.anchor[0] / IMG_PX, ay = sl.anchor[1] / IMG_PX;
-    if (lx >= ax - w / 2 && lx <= ax + w / 2 && ly >= ay - hh && ly <= ay) return showWord(sl.word, ax, ay - hh);
+  for (const sl of [...SKIN_SLOTS].reverse()) {   // 装扮物件：按装扮图的范围判断（前面的先算）
+    const id = sl.kind === 'prop' && skinOn(sl.id), b = id && skinBounds(sl, id); if (!b) continue;
+    if (lx >= b.x && lx <= b.x + b.w && ly >= b.y && ly <= b.y + b.h && skinHit(id, (lx - b.x) / b.w, (ly - b.y) / b.h)) return showWord(sl.word, b.cx, b.top);
   }
   const s = SPOTS.find(s => lx >= s.r[0] && lx <= s.r[0] + s.r[2] && ly >= s.r[1] && ly <= s.r[1] + s.r[3]);
   if (s) {
@@ -2415,7 +2457,7 @@ function openSettings() {
 // ================= 版本、更新、存档码 =================
 // 每次发布把 BUILD 加一，同时改 game/version.json。打开游戏时去 GitHub 看最新版本号，有新的就问要不要更新；
 // 进度存在本机浏览器里，更新只换游戏本身，进度、金币、单词成绩都保留。
-const BUILD = 17, BUILD_DATE = '2026-10-31';
+const BUILD = 18, BUILD_DATE = '2026-10-31';
 const REPO = 'a01022971718-cyber/mv', BRANCH = 'ccr-17470247-hlo7zp';
 async function latestBuild() {
   // 先问 GitHub API（没有 CDN 缓存），连不上再试 raw.githubusercontent
@@ -2503,7 +2545,7 @@ function go(v) {
   $('#stage').scrollTop = 0;
   if (v === 'farm') fitFarm(); if (v === 'diner') fitDiner();
   if (FGAME && FGAME.isBooted) { if (v === 'farm') FGAME.loop.wake(); else FGAME.loop.sleep(); }
-  refresh(); syncSeedHand();
+  refresh(); syncSeedHand(); syncAdjBar();
 }
 function refreshHUD() {
   $('#lvText').textContent = 'Lv ' + S.lv;
